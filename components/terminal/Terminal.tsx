@@ -364,7 +364,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           writeOutput(uptimeCommand(loadTimeRef.current));
           break;
         case 'docker':
-          writeOutput(dockerCommand(args));
+          writeOutput(dockerCommand(args, loadTimeRef.current));
           break;
         case 'ssh':
           if (xtermRef.current) {

@@ -696,7 +696,11 @@ export function uptimeCommand(loadTime: number): string {
 }
 
 // Docker command with subcommands
-export function dockerCommand(args: string[]): string {
+export function dockerCommand(args: string[], loadTime: number): string {
+  const diffMs = Date.now() - loadTime;
+  const totalMin = Math.floor(diffMs / 60000);
+  const upStr = totalMin > 0 ? `Up ${totalMin} minute${totalMin !== 1 ? 's' : ''}` : 'Up Less than a minute';
+
   const sub = args[0];
   if (!sub) {
     return `Usage: docker [command]
@@ -712,10 +716,10 @@ ${ANSI.dim}hint: try 'docker ps' or 'docker images'${ANSI.reset}`;
 
   switch (sub) {
     case 'ps':
-      return `${ANSI.bold}CONTAINER ID   IMAGE                  STATUS          NAMES${ANSI.reset}
-${ANSI.green}a1b2c3d4e5f6${ANSI.reset}   otisscott-me:latest    Up 42 minutes   ${ANSI.cyan}portfolio${ANSI.reset}
-${ANSI.green}f6e5d4c3b2a1${ANSI.reset}   theme-engine:1.0       Up 42 minutes   ${ANSI.cyan}theme-engine${ANSI.reset}
-${ANSI.green}1a2b3c4d5e6f${ANSI.reset}   xterm-renderer:3.2     Up 42 minutes   ${ANSI.cyan}xterm-renderer${ANSI.reset}`;
+      return `${ANSI.bold}CONTAINER ID   IMAGE                  STATUS                  NAMES${ANSI.reset}
+${ANSI.green}a1b2c3d4e5f6${ANSI.reset}   otisscott-me:latest    ${upStr.padEnd(22)}  ${ANSI.cyan}portfolio${ANSI.reset}
+${ANSI.green}f6e5d4c3b2a1${ANSI.reset}   theme-engine:1.0       ${upStr.padEnd(22)}  ${ANSI.cyan}theme-engine${ANSI.reset}
+${ANSI.green}1a2b3c4d5e6f${ANSI.reset}   xterm-renderer:3.2     ${upStr.padEnd(22)}  ${ANSI.cyan}xterm-renderer${ANSI.reset}`;
     case 'images':
       return `${ANSI.bold}REPOSITORY          TAG       SIZE${ANSI.reset}
 otisscott-me        latest    42MB
@@ -731,6 +735,19 @@ ${ANSI.dim}cowsay              moo       1MB${ANSI.reset}`;
  ${ANSI.green}✔${ANSI.reset} Container theme-engine    ${ANSI.green}Started${ANSI.reset}
  ${ANSI.green}✔${ANSI.reset} Container xterm-renderer  ${ANSI.green}Started${ANSI.reset}
 ${ANSI.dim}Everything's already running. You're on the site.${ANSI.reset}`;
+      }
+      if (args[1] === 'down') {
+        return `${ANSI.red}[+] Stopping 3/3${ANSI.reset}
+ ${ANSI.red}✔${ANSI.reset} Container xterm-renderer  ${ANSI.red}Stopped${ANSI.reset}
+ ${ANSI.red}✔${ANSI.reset} Container theme-engine    ${ANSI.red}Stopped${ANSI.reset}
+ ${ANSI.red}✔${ANSI.reset} Container portfolio       ${ANSI.red}Stopped${ANSI.reset}
+${ANSI.dim}Just kidding. You can't shut down the site from the site.${ANSI.reset}`;
+      }
+      if (args[1] === 'ps') {
+        return `${ANSI.bold}NAME              IMAGE                  STATUS${ANSI.reset}
+portfolio         otisscott-me:latest    ${ANSI.green}${upStr}${ANSI.reset}
+theme-engine      theme-engine:1.0       ${ANSI.green}${upStr}${ANSI.reset}
+xterm-renderer    xterm-renderer:3.2     ${ANSI.green}${upStr}${ANSI.reset}`;
       }
       return `Usage: docker compose [up|down|ps]`;
     default:
