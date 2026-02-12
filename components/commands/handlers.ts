@@ -574,7 +574,7 @@ export function codexCommand(cols: number): string {
     `${d}╭${titleText}${'─'.repeat(topFill)}╮${r}`,
     row(`${d}>_${r} ${ANSI.bold}OpenAI Codex${r} ${d}(v0.1.2503262313)${r}`),
     row(''),
-    row(`${d}model:     ${r}o4-mini   ${d}/model${ANSI.cyan} to change${r}`),
+    row(`${d}model:     ${r}gpt-5.3-codex-high   ${d}/model${ANSI.cyan} to change${r}`),
     row(`${d}directory: ${r}~/Projects/otisscott.me`),
     `${d}╰${'─'.repeat(W + 2)}╯${r}`,
   ].join('\n');
