@@ -81,3 +81,17 @@ export const PromptColors = {
   error: '\x1b[31m',          // Red for error indicator
   reset: '\x1b[0m',
 } as const;
+
+// ANSI-aware string utilities
+export function stripAnsi(str: string): string {
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+export function visibleLength(str: string): number {
+  return stripAnsi(str).length;
+}
+
+export function padEndVisible(str: string, targetLen: number): string {
+  const pad = targetLen - visibleLength(str);
+  return pad > 0 ? str + ' '.repeat(pad) : str;
+}

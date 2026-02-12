@@ -18,7 +18,7 @@ function createFile(
     owner: options.owner ?? 'otis',
     group: options.group ?? 'staff',
     size: options.size ?? content.length,
-    modified: options.modified ?? new Date('2025-01-15'),
+    modified: options.modified ?? new Date('2026-02-01'),
   };
 }
 
@@ -39,7 +39,7 @@ function createDirectory(
     permissions: options.permissions ?? 'drwxr-xr-x',
     owner: options.owner ?? 'otis',
     group: options.group ?? 'staff',
-    modified: options.modified ?? new Date('2025-01-15'),
+    modified: options.modified ?? new Date('2026-02-01'),
   };
 }
 
@@ -50,139 +50,161 @@ export const rootDirectory = createDirectory('', [
 ║  Otis Scott                                                    ║
 ╠════════════════════════════════════════════════════════════════╣
 ║                                                                ║
-║  Software Engineer • Open Source Enthusiast • Terminal Addict  ║
+║  Director of Technology @ Manhattan Wine Company               ║
+║  Co-Founder & Engineer @ DataEarn                              ║
 ║                                                                ║
-║  Currently building things that live on the web. I enjoy       ║
-║  clean code, fast terminals, and solving interesting problems. ║
-║                                                                ║
-║  When I'm not coding, you'll find me exploring new tools,      ║
-║  contributing to open source, or tinkering with my dotfiles.   ║
+║  NYU CS '22 · Building at the intersection of wine & tech.     ║
+║  Turning a 40-year-old wine business into a software company.  ║
 ║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝`),
     createFile('bio.md', `# About Me
 
-Hello! I'm **Otis Scott**, a software engineer who believes the command line is the highest form of user interface.
+I'm **Otis Scott** — a software engineer building technology for the wine industry.
 
-## What I Do
+## Background
 
-I build web applications, developer tools, and occasionally things that make people say "wait, you built that in a terminal?"
+I studied Computer Science at **NYU** (BS '22) and have been writing code since high school. After college I co-founded **DataEarn**, a data monetization platform, and spent time in sales roles at FiscalNote and Aer Compliance before joining the family business.
+
+## What I Do Now
+
+I'm the **Director of Technology** at **Manhattan Wine Company**, a 40-year-old fine wine storage and logistics company in NYC. I'm building **Cellar OS** — a full-stack SaaS platform to modernize how the company manages wine inventory, client accounts, and warehouse operations.
+
+I also build **Shopify apps** for wine merchants — tools for LWIN-based inventory mapping, appraisals, and catalog management.
 
 ## Philosophy
 
-- **Simplicity over complexity** - The best code is no code
-- **Terminal-first** - If it can be done in a CLI, it should be
-- **Open source everything** - Knowledge wants to be free
-
-## Fun Facts
-
-- My dotfiles are probably over-engineered
-- I have strong opinions about shell prompts
-- This website is a terminal because why not?
-
-> "The terminal is not a step backward—it's a leap toward control."
+- **Build for the domain** — The best software comes from deeply understanding the business
+- **Ship and iterate** — Working software over perfect plans
+- **Automate the tedious** — Let people focus on what matters
 `),
     createFile('interests.txt', `Things I'm Into:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• Terminal emulators & CLI tools
+• Wine industry technology
+• AI/ML and developer tooling
+• Full-stack web development
+• Neovim & terminal workflows
 • Open source software
-• Web development (React, Next.js, TypeScript)
-• Developer experience & tooling
-• Minimalist design
-• Mechanical keyboards
-• Self-hosting & homelabs
-• Neovim (btw)`),
+• Shopify app development
+• Data systems & automation`),
   ]),
   createDirectory('work', [
     createDirectory('experience', [
-      createFile('senior-engineer.md', `# Senior Software Engineer
-## TechCorp Industries
+      // Inserted oldest-first; experienceCommand() calls .reverse() for newest-first display
+      createFile('intern-ironwood.md', `# Research Intern
+## Ironwood Capital Management
 
-📅 2023 - Present
+📅 July 2019 - August 2019
 
-Leading a team of 5 engineers building the company's core platform.
+Summer research internship at a San Francisco-based investment firm.
 
 ### Responsibilities
-- Architected and deployed microservices infrastructure
-- Reduced API latency by 40% through optimization efforts
-- Mentored junior developers and established code review practices
-- Implemented CI/CD pipelines reducing deployment time by 60%
+- Conducted market research and financial analysis
+- Supported investment decision-making with data-driven insights
+
+### Location
+San Francisco, CA`),
+      createFile('cofounded-dataearn.md', `# Co-Founder & Founding Engineer
+## DataEarn
+
+📅 June 2020 - Present
+
+Co-founded a data monetization platform. Built the full stack from scratch — backend API, frontend app, and cloud infrastructure.
+
+### What I Built
+- Backend API with Django and Django REST Framework
+- Frontend application with Next.js and React
+- Cloud infrastructure on Azure (VMs, storage, networking)
+- User authentication, data pipelines, and admin tooling
 
 ### Technologies
-TypeScript, Node.js, PostgreSQL, Docker, Kubernetes, AWS`),
-      createFile('fullstack-dev.md', `# Full Stack Developer
-## StartupXYZ
+Python, Django, DRF, Next.js, React, Azure, PostgreSQL`),
+      createFile('sdr-fiscalnote.md', `# Sales Development Representative
+## FiscalNote
 
-📅 2021 - 2023
+📅 January 2023 - January 2024
 
-Joined as employee #10, helped scale the platform to 100K+ users.
+Outbound sales development for a regulatory data and analytics platform serving government affairs teams.
 
-### Achievements
-- Built real-time collaboration features using WebSockets
-- Implemented authentication system supporting OAuth, SAML, SSO
-- Optimized database queries reducing load times by 50%
-- Led migration from REST to GraphQL
+### Location
+New York, NY`),
+      createFile('bdr-aer.md', `# Business Development Representative
+## Aer Compliance
+
+📅 January 2024 - October 2024
+
+Business development for an environmental compliance software company.
+
+### Location
+New York, NY`),
+      createFile('sales-infrastructure.md', `# Sales & Infrastructure
+## Manhattan Wine Company
+
+📅 October 2024 - September 2025
+
+Joined the family wine business to modernize operations. Started by handling sales while scoping the technology needs of a 40-year-old company.
+
+### What I Did
+- Managed client relationships and wine sales operations
+- Audited existing systems and identified automation opportunities
+- Began prototyping Cellar OS for inventory and warehouse management
+- Earned WSET Level 2 certification
 
 ### Technologies
-React, TypeScript, Python, FastAPI, Redis, PostgreSQL`),
-      createFile('junior-dev.md', `# Junior Developer
-## WebAgency Pro
+Python, Django, PostgreSQL, Shopify`),
+      createFile('director-of-tech.md', `# Director of Technology
+## Manhattan Wine Company
 
-📅 2019 - 2021
+📅 September 2025 - Present
 
-Started my professional journey building websites for clients.
+Leading technology strategy and building Cellar OS — a full-stack platform to run the wine storage, logistics, and sales operations.
 
-### Experience
-- Developed 20+ client websites using modern frameworks
-- Collaborated with designers to implement pixel-perfect UIs
-- Maintained and updated legacy PHP applications
-- Learned the importance of testing and documentation
+### What I'm Building
+- Cellar OS: inventory management, client portals, warehouse operations
+- Shopify apps for wine merchants (LWIN mapping, appraisals)
+- Data integrations with third-party wine databases
+- Internal tooling for warehouse staff and sales team
 
 ### Technologies
-JavaScript, PHP, Laravel, Vue.js, MySQL, WordPress`),
+Python, Django, React, TypeScript, PostgreSQL, Redis, Docker, Shopify, Prisma`),
     ]),
     createFile('skills.json', JSON.stringify({
       languages: {
         icon: "💻",
         items: [
-          { name: "TypeScript", level: "expert", years: 5 },
+          { name: "Python", level: "expert", years: 6 },
+          { name: "TypeScript", level: "expert", years: 4 },
           { name: "JavaScript", level: "expert", years: 6 },
-          { name: "Python", level: "proficient", years: 4 },
-          { name: "Go", level: "proficient", years: 2 },
-          { name: "Rust", level: "learning", years: 1 },
-          { name: "SQL", level: "proficient", years: 5 }
+          { name: "SQL", level: "expert", years: 5 }
         ]
       },
       frontend: {
         icon: "🎨",
         items: [
-          { name: "React", level: "expert", years: 5 },
-          { name: "Next.js", level: "expert", years: 4 },
-          { name: "TypeScript", level: "expert", years: 5 },
-          { name: "Tailwind CSS", level: "expert", years: 3 },
-          { name: "Vue.js", level: "proficient", years: 2 },
+          { name: "React", level: "expert", years: 4 },
+          { name: "Next.js", level: "proficient", years: 3 },
+          { name: "Remix/React Router", level: "proficient", years: 2 },
+          { name: "Tailwind CSS", level: "proficient", years: 3 },
           { name: "HTML/CSS", level: "expert", years: 6 }
         ]
       },
       backend: {
         icon: "⚙️",
         items: [
-          { name: "Node.js", level: "expert", years: 5 },
-          { name: "PostgreSQL", level: "proficient", years: 4 },
+          { name: "Django/DRF", level: "expert", years: 5 },
+          { name: "Node.js", level: "proficient", years: 4 },
+          { name: "PostgreSQL", level: "expert", years: 5 },
           { name: "Redis", level: "proficient", years: 3 },
-          { name: "GraphQL", level: "proficient", years: 3 },
-          { name: "FastAPI", level: "proficient", years: 2 },
-          { name: "MongoDB", level: "familiar", years: 2 }
+          { name: "Prisma", level: "proficient", years: 2 }
         ]
       },
-      devops: {
+      platforms: {
         icon: "🚀",
         items: [
+          { name: "Shopify App Dev", level: "proficient", years: 2 },
+          { name: "Azure", level: "proficient", years: 3 },
           { name: "Docker", level: "proficient", years: 4 },
-          { name: "Kubernetes", level: "familiar", years: 2 },
-          { name: "AWS", level: "proficient", years: 3 },
-          { name: "CI/CD", level: "proficient", years: 4 },
-          { name: "Terraform", level: "familiar", years: 2 },
+          { name: "Sentry", level: "proficient", years: 2 },
           { name: "Linux", level: "proficient", years: 5 }
         ]
       },
@@ -191,56 +213,115 @@ JavaScript, PHP, Laravel, Vue.js, MySQL, WordPress`),
         items: [
           { name: "Git", level: "expert", years: 6 },
           { name: "Neovim", level: "expert", years: 3 },
-          { name: "VS Code", level: "expert", years: 5 },
-          { name: "Figma", level: "proficient", years: 3 },
-          { name: "Postman", level: "proficient", years: 4 },
-          { name: "Jest/Vitest", level: "proficient", years: 4 }
+          { name: "Claude Code", level: "proficient", years: 1 },
+          { name: "Zsh", level: "proficient", years: 4 }
         ]
       }
     }, null, 2)),
+  ]),
+  createDirectory('education', [
+    createFile('nyu.md', `# New York University
+## Bachelor of Science — Computer Science
+
+📅 2018 - 2022
+
+Courant Institute of Mathematical Sciences, NYU.`),
+    createFile('wset.md', `# Wine & Spirit Education Trust
+## Level 2 Award in Wines
+
+📅 October 2024 - December 2024
+
+Systematic approach to wine tasting, grape varieties, and regions.`),
   ]),
   createDirectory('contact', [
     createFile('email.txt', `📧 Email Contact
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-hello@otisscott.me
+otismscott@gmail.com
 
 For inquiries about:
-  • Freelance work & consulting
-  • Collaboration opportunities
-  • Speaking engagements
-  • Just saying hi 👋
-
-Response time: Usually within 24-48 hours`),
+  • Technology consulting & collaboration
+  • Wine industry software
+  • Open source projects
+  • Just saying hi`),
     createFile('social.json', JSON.stringify({
       github: {
         url: "github.com/otisscott",
         handle: "@otisscott",
-        description: "Code, dotfiles, and open source contributions"
-      },
-      twitter: {
-        url: "twitter.com/otisscott",
-        handle: "@otisscott",
-        description: "Hot takes on tech, occasional shitposts"
+        description: "Code, dotfiles, and open source projects"
       },
       linkedin: {
-        url: "linkedin.com/in/otisscott",
+        url: "linkedin.com/in/otis-scott",
         handle: "Otis Scott",
-        description: "Professional networking & career updates"
-      },
-      bluesky: {
-        url: "bsky.app/profile/otisscott.me",
-        handle: "@otisscott.me",
-        description: "The better Twitter"
-      },
-      mastodon: {
-        url: "fosstodon.org/@otisscott",
-        handle: "@otisscott@fosstodon.org",
-        description: "Decentralized social (I should post here more)"
+        description: "Professional background & career updates"
       }
     }, null, 2)),
   ]),
   createDirectory('projects', [
+    createFile('cellar-os.md', `# Cellar OS
+
+Fine asset management SaaS for Manhattan Wine Company.
+
+## What It Does
+- Wine inventory tracking with LWIN integration
+- Client account management and portals
+- Warehouse operations (inbound/outbound, cycle counts)
+- Reporting and analytics
+
+## Tech Stack
+- Django + Django REST Framework (API)
+- React + TypeScript (frontend)
+- PostgreSQL + Redis (data layer)
+- Docker (deployment)
+
+🔒 Internal — proprietary`),
+    createFile('dataearn.md', `# DataEarn
+
+Data monetization platform — co-founded in 2020.
+
+## What It Does
+- Allows users to monetize their personal data
+- Connects data providers with buyers through a marketplace
+- Handles consent, privacy, and compliance
+
+## Tech Stack
+- Django + DRF (backend API)
+- Next.js + React (frontend)
+- Azure (cloud infrastructure)
+- PostgreSQL (database)
+
+🔗 dataearn.com`),
+    createFile('lwin-mapping.md', `# LWIN Mapping
+
+Shopify app for wine inventory and appraisal management.
+
+## What It Does
+- Maps wine products to LWIN (London International Vintners Exchange) identifiers
+- Provides market value appraisals for wine inventory
+- Bulk import/export for catalog management
+
+## Tech Stack
+- React Router 7 (Remix)
+- Prisma (ORM)
+- Sentry (error tracking)
+- Shopify App Bridge
+
+🔒 Shopify App Store — in development`),
+    createFile('sec-scraper.md', `# SEC Form ADV Scraper
+
+Open source tool for automated SEC filing consumption.
+
+## What It Does
+- Scrapes SEC EDGAR for Form ADV filings
+- Extracts structured data from XML and PDF documents
+- Handles rate limiting and incremental updates
+
+## Tech Stack
+- Python
+- XML/PDF parsing
+- SEC EDGAR API
+
+🔗 github.com/otisscott`),
     createFile('terminal-portfolio.md', `# Terminal Portfolio
 
 **This website!**
@@ -251,7 +332,7 @@ A terminal-inspired portfolio built with Next.js and xterm.js.
 - Full terminal emulation with xterm.js
 - Virtual filesystem with navigation
 - Syntax highlighting for code files
-- Pure prompt styling
+- Tokyo Night color theme
 - Easter eggs (try \`neofetch\` or \`cowsay\`!)
 
 ## Tech Stack
@@ -259,61 +340,24 @@ A terminal-inspired portfolio built with Next.js and xterm.js.
 - React 19
 - TypeScript
 - xterm.js
-- Tokyo Night theme
 
-🔗 github.com/otisscott/terminal-portfolio`),
-    createFile('cli-tool.md', `# DevCLI
+🔗 github.com/otisscott/otisscott.me`),
+    createFile('dotfiles.md', `# Dotfiles
 
-A command-line tool for common developer workflows.
+Heavily documented personal configuration.
 
-## What It Does
-- Project scaffolding with templates
-- Git workflow automation
-- Environment setup and configuration
-- Deployment helpers
+## Includes
+- Neovim config (LSP, Treesitter, custom keymaps)
+- Zsh config (979 lines of aliases, functions, prompts)
+- Claude Code rules and agent configuration
+- tmux, git, and tool configs
 
-## Installation
-\`\`\`bash
-npm install -g @otisscott/devcli
-\`\`\`
+## Highlights
+- Modular Neovim setup with lazy.nvim
+- Custom Zsh prompt with git integration
+- Extensive Claude Code skill library
 
-## Usage
-\`\`\`bash
-devcli init my-project --template nextjs
-devcli deploy --env production
-\`\`\`
-
-🔗 github.com/otisscott/devcli`),
-    createFile('vscode-extension.md', `# Tokyo Night Enhanced
-
-A VS Code theme based on Tokyo Night with additional language support.
-
-## Features
-- Enhanced syntax highlighting for 20+ languages
-- Semantic token support
-- Custom file icon theme
-- Matching terminal theme
-
-## Install
-Search "Tokyo Night Enhanced" in VS Code extensions.
-
-🔗 marketplace.visualstudio.com/items?itemName=otisscott.tokyo-night-enhanced`),
-    createFile('open-source.md', `# Open Source Contributions
-
-## Projects I Maintain
-- **termcolors** - Terminal color scheme converter
-- **git-aliases** - Sensible git aliases collection
-- **dotfiles** - My personal dotfiles (heavily commented)
-
-## Projects I've Contributed To
-- neovim/neovim - Documentation improvements
-- withastro/astro - Bug fixes
-- vercel/next.js - Examples and docs
-
-## Philosophy
-I believe in giving back to the tools that make my work possible.
-
-🔗 github.com/otisscott`),
+🔗 github.com/otisscott/dotfiles`),
   ]),
   createDirectory('blog', [
     createDirectory('2025', [
@@ -324,13 +368,6 @@ I believe in giving back to the tools that make my work possible.
 The web has become heavy. Every portfolio site is a React app with 50MB of JavaScript, 5 different animation libraries, and a loading spinner that spins for 3 seconds.
 
 I wanted something different...
-
-[Read more - coming soon]`),
-      createFile('neovim-setup.md', `# My Neovim Configuration in 2025
-
-*Published: January 2025*
-
-After 3 years of tweaking, I've finally reached a setup I'm happy with. Here's what I'm using...
 
 [Read more - coming soon]`),
     ]),
@@ -344,54 +381,46 @@ This is a hidden file that only appears with ls -a`),
 What I'm currently focused on:
 
 ## Work
-• Building developer tools at TechCorp
-• Leading platform architecture decisions
+• Building Cellar OS at Manhattan Wine Company
+• Shopify app development for wine merchants
+• Modernizing warehouse operations with software
 
 ## Side Projects
 • This terminal portfolio
-• A CLI tool for common dev workflows
-• Learning Rust (slowly but surely)
+• SEC Form ADV scraper
+• Dotfiles and developer tooling
 
-## Reading
-• "Designing Data-Intensive Applications"
-• Various technical blogs and RFCs
+## Learning
+• AI/ML tooling and agent workflows
+• Shopify app ecosystem
+• Wine (WSET Level 2 certified)
 
-## Listening
-• Syntax.fm
-• The Changelog
-• Various lo-fi playlists while coding
-
-Last updated: January 2025`),
+Last updated: February 2026`),
     createFile('uses.txt', `# Uses
 
 ## Hardware
-• MacBook Pro 16" (M3 Max)
-• Keychron Q1 Pro (Gateron Brown)
-• LG UltraFine 5K Display
-• AirPods Pro 2
-• Logitech MX Master 3S
+• Custom PC running WSL2 + Ubuntu
+• Dual monitors
 
-## Software
-• Neovim (primary editor)
-• VS Code (for pair programming)
-• iTerm2 (terminal)
-• Arc (browser)
-• Linear (project management)
-• Raycast (launcher)
+## Editor
+• Neovim (primary — LSP, Treesitter, lazy.nvim)
+
+## Terminal
+• Zsh (979 lines of config)
+• tmux
+• fzf, ripgrep, fd, bat, eza
 
 ## Dev Tools
-• fish shell
-• tmux
-• fzf
-• ripgrep
-• fd
-• bat
+• Claude Code (AI pair programming)
+• Docker
+• Git
+• Bun (JS/TS) + uv (Python)
 
 ## Services
 • GitHub
 • Vercel
-• Linear
-• Figma`),
+• Sentry
+• Shopify Partners`),
     createFile('colophon.md', `# Colophon
 
 This site is built with:
@@ -407,11 +436,6 @@ This site is built with:
 ## Hosting
 Deployed on Vercel with automatic deployments from GitHub.
 
-## Inspiration
-- wttr.in - Weather in the terminal
-- github.com/chubin - Terminal services
-- All the terminal enthusiasts out there
-
 ---
 
 Made with ⌨️ and ☕ by Otis Scott`),
@@ -420,12 +444,12 @@ Made with ⌨️ and ☕ by Otis Scott`),
 
 // Git-like fake commits for the git log command
 export const fakeCommits = [
-  { hash: 'a1b2c3d', message: 'feat: add neofetch easter egg', date: '2025-02-10', author: 'Otis Scott' },
-  { hash: 'e4f5g6h', message: 'feat: implement tab completion', date: '2025-02-09', author: 'Otis Scott' },
-  { hash: 'i7j8k9l', message: 'style: pure prompt styling', date: '2025-02-08', author: 'Otis Scott' },
-  { hash: 'm0n1o2p', message: 'feat: add filesystem navigation commands', date: '2025-02-07', author: 'Otis Scott' },
-  { hash: 'q3r4s5t', message: 'feat: initial terminal setup', date: '2025-02-06', author: 'Otis Scott' },
-  { hash: 'u6v7w8x', message: 'chore: project setup with next.js', date: '2025-02-05', author: 'Otis Scott' },
+  { hash: 'a1b2c3d', message: 'feat: add neofetch easter egg', date: '2026-02-10', author: 'Otis Scott' },
+  { hash: 'e4f5g6h', message: 'feat: implement tab completion', date: '2026-02-09', author: 'Otis Scott' },
+  { hash: 'i7j8k9l', message: 'style: tokyo night theme', date: '2026-02-08', author: 'Otis Scott' },
+  { hash: 'm0n1o2p', message: 'feat: add filesystem navigation commands', date: '2026-02-07', author: 'Otis Scott' },
+  { hash: 'q3r4s5t', message: 'feat: initial terminal setup', date: '2026-02-06', author: 'Otis Scott' },
+  { hash: 'u6v7w8x', message: 'chore: project setup with next.js', date: '2026-02-05', author: 'Otis Scott' },
 ];
 
 // Node version for prompt
