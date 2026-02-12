@@ -156,6 +156,12 @@ function renderMarkdown(content: string): string {
       line = line.replace(/\*(.+?)\*/g, `${ANSI.italic}$1${ANSI.reset}${ANSI.white}`);
       // Code
       line = line.replace(/`(.+?)`/g, `${ANSI.brightBlack}$1${ANSI.reset}${ANSI.white}`);
+      // Markdown links [text](url) → OSC 8 clickable
+      line = line.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+        (_, text, url) => `\x1b]8;;${url}\x07${ANSI.cyan}${ANSI.underline}${text}${ANSI.reset}\x1b]8;;\x07`);
+      // Bare URLs → OSC 8 clickable (only if not already inside an OSC 8 sequence)
+      line = line.replace(/(^|[\s🔗])((https?:\/\/)[^\s"',)]+)/g,
+        (_, prefix, url) => `${prefix}\x1b]8;;${url}\x07${ANSI.cyan}${ANSI.underline}${url}${ANSI.reset}\x1b]8;;\x07`);
       return line;
     })
     .join('\n');
