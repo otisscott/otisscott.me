@@ -33,14 +33,11 @@ import {
   grepCommand,
   historyCommand,
   openCommand,
-  claudeCommand,
-  codexCommand,
-  opencodeCommand,
   packageManagerCommand,
   getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
-import { startVim, startSl, startRmRf } from '@/components/commands/interactive';
+import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode } from '@/components/commands/interactive';
 import { ANSI, padEndVisible } from '@/lib/filesystem/types';
 
 interface TerminalProps {
@@ -333,13 +330,22 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           break;
         case 'claude':
         case 'claude-code':
-          writeOutput(claudeCommand(xtermRef.current?.cols || 80));
+          if (xtermRef.current) {
+            startClaude(getTerminalContext());
+            return;
+          }
           break;
         case 'codex':
-          writeOutput(codexCommand(xtermRef.current?.cols || 80));
+          if (xtermRef.current) {
+            startCodex(getTerminalContext());
+            return;
+          }
           break;
         case 'opencode':
-          writeOutput(opencodeCommand(xtermRef.current?.cols || 80));
+          if (xtermRef.current) {
+            startOpencode(getTerminalContext());
+            return;
+          }
           break;
         case 'npm':
         case 'npx':
