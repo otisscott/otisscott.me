@@ -46,6 +46,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const cursorPositionRef = useRef(0);
   const tabPressCountRef = useRef(0);
   const lastTabInputRef = useRef('');
+  const ghostTextRef = useRef('');
 
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
@@ -113,6 +114,41 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
       }
     }
   }, [writeShortPrompt]);
+
+  const computeGhostText = useCallback((): string => {
+    const input = inputBufferRef.current;
+    if (!input || cursorPositionRef.current !== input.length) return '';
+
+    // Try command history first (most recent match)
+    for (let i = commandHistoryRef.current.length - 1; i >= 0; i--) {
+      const histCmd = commandHistoryRef.current[i];
+      if (histCmd.startsWith(input) && histCmd !== input) {
+        return histCmd.slice(input.length);
+      }
+    }
+
+    // Fall back to single-match completions
+    const { completions } = getCompletions(input);
+    if (completions.length === 1) {
+      const parts = input.split(' ');
+      if (parts.length <= 1 && !input.includes(' ')) {
+        // Command completion
+        return completions[0].slice(input.length) + ' ';
+      } else {
+        // Path completion
+        const cmd = parts[0];
+        const rest = parts.slice(1).join(' ');
+        const lastSlashIndex = rest.lastIndexOf('/');
+        const dirPart = lastSlashIndex >= 0 ? rest.slice(0, lastSlashIndex + 1) : '';
+        const completed = `${cmd} ${dirPart}${completions[0]}`;
+        if (completed.startsWith(input)) {
+          return completed.slice(input.length);
+        }
+      }
+    }
+
+    return '';
+  }, []);
 
   const handleCommand = useCallback((command: string) => {
     const trimmedCommand = command.trim();
@@ -291,6 +327,13 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     term.onData((data) => {
       const code = data.charCodeAt(0);
 
+      // Save and clear ghost text before processing input
+      const hadGhost = ghostTextRef.current;
+      if (hadGhost) {
+        term.write('\x1b[K');
+        ghostTextRef.current = '';
+      }
+
       if (code === 13) {
         handleCommand(inputBufferRef.current);
       } else if (code === 127) {
@@ -328,7 +371,11 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
             writeShortPrompt();
           }
         } else if (data === '\x1b[C') {
-          if (cursorPositionRef.current < inputBufferRef.current.length) {
+          if (cursorPositionRef.current >= inputBufferRef.current.length && hadGhost) {
+            inputBufferRef.current += hadGhost;
+            cursorPositionRef.current = inputBufferRef.current.length;
+            term.write(hadGhost);
+          } else if (cursorPositionRef.current < inputBufferRef.current.length) {
             cursorPositionRef.current++;
             term.write(data);
           }
@@ -339,7 +386,13 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           }
         }
       } else if (code === 9) {
-        handleTabCompletion();
+        if (hadGhost && cursorPositionRef.current === inputBufferRef.current.length) {
+          inputBufferRef.current += hadGhost;
+          cursorPositionRef.current = inputBufferRef.current.length;
+          term.write(hadGhost);
+        } else {
+          handleTabCompletion();
+        }
       } else if (code === 3) {
         term.write('^C');
         inputBufferRef.current = '';
@@ -360,6 +413,15 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         }
       }
 
+      // Show ghost suggestion
+      if (inputBufferRef.current && cursorPositionRef.current === inputBufferRef.current.length) {
+        const ghost = computeGhostText();
+        if (ghost) {
+          term.write(`${ANSI.dim}${ghost}${ANSI.reset}\x1b[${ghost.length}D`);
+          ghostTextRef.current = ghost;
+        }
+      }
+
       if (onData) {
         onData(data);
       }
@@ -372,7 +434,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
       term.dispose();
       xtermRef.current = null;
     };
-  }, [handleCommand, handleTabCompletion, onData, writePrompt, writeShortPrompt]);
+  }, [handleCommand, handleTabCompletion, computeGhostText, onData, writePrompt, writeShortPrompt]);
 
   return (
     <div
