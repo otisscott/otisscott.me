@@ -316,6 +316,41 @@ export function glCommand(): string {
   return output.join('\n\n');
 }
 
+// Git command with subcommands
+export function gitCommand(args: string[]): string {
+  const sub = args[0];
+  if (!sub) {
+    return `usage: git <command>
+
+${ANSI.bold}available commands:${ANSI.reset}
+  status    Show the working tree status
+  log       Show commit logs
+  branch    List branches
+  remote    Show remotes
+
+${ANSI.dim}hint: try 'git log' or 'git status'${ANSI.reset}`;
+  }
+  switch (sub) {
+    case 'status':
+      return gsCommand();
+    case 'log':
+      return glCommand();
+    case 'branch':
+      return `* ${ANSI.green}main${ANSI.reset}`;
+    case 'remote':
+      if (args[1] === '-v') {
+        return `origin  https://github.com/otisscott/otisscott.me.git (fetch)\norigin  https://github.com/otisscott/otisscott.me.git (push)`;
+      }
+      return 'origin';
+    case 'push':
+      return `${ANSI.red}error: permission denied${ANSI.reset}\n${ANSI.dim}hint: nice try ;)${ANSI.reset}`;
+    case 'commit':
+      return `${ANSI.red}error: permission denied${ANSI.reset}`;
+    default:
+      return `git: '${sub}' is not a git command. See 'git' for usage.`;
+  }
+}
+
 // Neofetch command
 export function neofetchCommand(): string {
   const loadTime = new Date();
