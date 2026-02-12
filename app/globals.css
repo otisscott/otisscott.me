@@ -1,0 +1,138 @@
+@import '@xterm/xterm/css/xterm.css';
+
+:root {
+  /* Tokyo Night Theme Colors */
+  --bg-primary: #1a1b26;
+  --bg-secondary: #16161e;
+  --bg-tertiary: #24283b;
+  --fg-primary: #a9b1d6;
+  --fg-secondary: #565f89;
+  --fg-bright: #c0caf5;
+
+  /* Accent Colors */
+  --color-red: #f7768e;
+  --color-orange: #ff9e64;
+  --color-yellow: #e0af68;
+  --color-green: #9ece6a;
+  --color-teal: #73daca;
+  --color-cyan: #7dcfff;
+  --color-blue: #7aa2f7;
+  --color-purple: #bb9af7;
+  --color-magenta: #ff007c;
+  --color-white: #c0caf5;
+
+  /* Terminal Chrome */
+  --chrome-close: #ff5f56;
+  --chrome-minimize: #ffbd2e;
+  --chrome-maximize: #27c93f;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  color: var(--fg-primary);
+  background: var(--bg-secondary);
+  font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* Next.js root element */
+#__next {
+  height: 100%;
+  width: 100%;
+}
+
+a {
+  color: var(--color-cyan);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Terminal Container Styles */
+.terminal-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.terminal-wrapper {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* xterm.js Customizations */
+.xterm {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.xterm-viewport {
+  background-color: var(--bg-primary) !important;
+}
+
+.xterm .xterm-rows {
+  font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  line-height: 1.2;
+}
+
+/* Scrollbar Styling */
+.xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-secondary);
+}
+
+/* Selection Styling */
+::selection {
+  background: var(--bg-tertiary);
+  color: var(--fg-bright);
+}
+
+/* Focus Styles */
+.xterm:focus-within {
+  outline: none;
+}
+
+/* Cursor Styles */
+.xterm-cursor {
+  background-color: var(--fg-bright) !important;
+}
+
+.xterm-cursor-block {
+  background-color: var(--fg-bright) !important;
+}
