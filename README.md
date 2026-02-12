@@ -1,88 +1,111 @@
 # otisscott.me
 
-A terminal-emulated personal website built with Next.js, TypeScript, and xterm.js. Features a fully functional terminal interface with custom commands, Tokyo Night theme, and Pure prompt styling.
+A terminal-emulated personal website built with Next.js, TypeScript, and xterm.js. Features a fully functional terminal interface with 40+ commands, multiple themes, and easter eggs.
 
-![Terminal Portfolio](screenshots/terminal.png)
+![Terminal Portfolio](screenshots/06-neofetch.png)
 
 ## Features
 
-- **Full Terminal Emulation** - xterm.js powered terminal with accurate rendering
-- **Custom Commands** - `ls`, `cd`, `cat`, `help`, `neofetch`, `cowsay`, and more
-- **Tokyo Night Theme** - Beautiful dark theme matching the popular VS Code theme
-- **Pure Prompt Style** - Git-aware prompt showing branch and Node version
-- **Tab Completion** - Smart command and file path completion
-- **Command History** - Navigate previous commands with arrow keys
-- **Responsive Design** - Terminal fits viewport and handles window resizing
+- **Full Terminal Emulation** — xterm.js with WebGL rendering
+- **40+ Commands** — navigation, portfolio, dev tools, easter eggs
+- **Multiple Themes** — Tokyo Night, Dracula, Nord, and more (light/dark auto-detection)
+- **Pure Prompt** — git-aware prompt with branch and Node version
+- **Tab Completion** — commands and file paths with ghost text suggestions
+- **Command History** — arrow key navigation with `history | grep` support
+- **Persistent State** — todo list and aliases saved to localStorage
+- **Responsive** — auto-fits viewport, handles resize
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
+- **Framework**: Next.js 16 (App Router, Turbopack)
 - **Language**: TypeScript
 - **Terminal**: xterm.js with FitAddon, WebLinksAddon, WebglAddon
 - **Styling**: CSS Modules + Global CSS
-- **Theme**: Tokyo Night color palette
+- **Deployment**: Vercel
 
 ## Getting Started
 
 ```bash
-# Install dependencies
 npm install
-
-# Run development server
 npm run dev
-
 # Open http://localhost:3000
 ```
 
-## Available Commands
+## Commands
 
+### Navigation
 | Command | Description |
 |---------|-------------|
-| `help` | Show available commands |
-| `ls [path]` | List directory contents |
+| `ls [-la]` | List directory contents |
 | `cd [path]` | Change directory |
-| `cat [file]` | Display file contents |
+| `cat [file]` | Display file contents (renders markdown/JSON) |
 | `pwd` | Print working directory |
-| `whoami` | Show user info |
-| `skills` | List technical skills |
-| `experience` | Show work experience |
-| `projects` | List projects |
-| `contact` | Show contact info |
+| `tree [path]` | Directory tree view |
+| `grep <pattern>` | Search file contents |
+| `open <file\|url>` | Open URL in new tab |
+
+### Portfolio
+| Command | Description |
+|---------|-------------|
+| `whoami` | User identity |
+| `skills` | Technical skills by category |
+| `experience` | Work history |
+| `projects` | Portfolio projects |
+| `contact` | Email and social links |
+
+### Tools
+| Command | Description |
+|---------|-------------|
+| `help` | All available commands |
+| `man <cmd>` | Manual pages for any command |
+| `history` | Command history (`history \| grep` supported) |
+| `todo` | Persistent todo list (add/done/rm/clear) |
+| `alias` | Define command aliases (persistent) |
+| `cal` | Calendar with today highlighted |
+| `theme [name]` | Switch color theme |
 | `neofetch` | System info display |
-| `cowsay [text]` | ASCII cow says something |
-| `clear` | Clear terminal |
-| `date` | Show current date |
+| `ping [host]` | Simulated ICMP |
+| `date` | Current date/time |
+
+### Easter Eggs
+| Command | Description |
+|---------|-------------|
+| `docker` | Container management (ps, images, compose) |
+| `ssh` | Connection animation |
+| `htop` | Live process viewer with project-themed processes |
+| `scp` | File transfer animation |
+| `make` | Build animation |
+| `jobs` / `fg` / `bg` | Background job system (append `&` to any command) |
+| `uptime` | Session uptime |
+| `vim` | Good luck getting out |
+| `cowsay` | ASCII cow |
+| `sl` | Steam locomotive |
+| `rm -rf /` | Don't worry about it |
+| `claude` / `codex` / `opencode` | AI tool easter eggs |
 
 ## Project Structure
 
 ```
 app/
-├── globals.css          # Global styles + Tokyo Night theme
-├── layout.tsx           # Root layout
-└── page.tsx             # Terminal page
+├── globals.css            # Global styles
+├── layout.tsx             # Root layout
+└── page.tsx               # Terminal page
 
 components/
 ├── terminal/
-│   └── Terminal.tsx     # Main terminal component
+│   └── Terminal.tsx        # Main terminal + input handling
 └── commands/
-    └── handlers.ts      # Command implementations
+    ├── handlers.ts         # Command implementations
+    ├── interactive.ts      # Animations + full-screen modes
+    └── man-pages.ts        # Man page content
 
 lib/
 ├── filesystem/
-│   ├── data.ts          # Virtual filesystem content
-│   └── types.ts         # TypeScript types
+│   ├── data.ts            # Virtual filesystem content
+│   └── types.ts           # Types + ANSI codes
 └── theme/
-    └── tokyo-night.ts   # xterm.js theme config
-
-content/                  # Markdown content for commands
-```
-
-## Deployment
-
-Built for static export and deployed on Vercel:
-
-```bash
-npm run build  # Creates static export in dist/
+    ├── themes.ts          # Theme registry
+    └── tokyo-night.ts     # Base theme
 ```
 
 ## License
