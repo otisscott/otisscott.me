@@ -1,0 +1,10 @@
+{
+  "[project]/components/terminal/Terminal.tsx [app-client] (ecmascript, next/dynamic entry)": {
+    "id": "[project]/components/terminal/Terminal.tsx [app-client] (ecmascript, next/dynamic entry)",
+    "files": [
+      "static/chunks/node_modules_@xterm_fc4e00a5._.js",
+      "static/chunks/_37dde4e2._.js",
+      "static/chunks/components_terminal_Terminal_tsx_9c218818._.js"
+    ]
+  }
+}
