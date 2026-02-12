@@ -529,25 +529,46 @@ export function openCommand(args: string[]): { output: string; url?: string } {
 
 // AI coding tool easter eggs
 export function claudeCommand(): string {
-  return `${ANSI.bold}${ANSI.magenta}  ╭─────────────────────────────────────╮
-  │      ${ANSI.white}Claude Code${ANSI.magenta}                      │
-  │      ${ANSI.dim}by Anthropic${ANSI.reset}${ANSI.magenta}                      │
-  │                                     │
-  │  ${ANSI.green}✓${ANSI.magenta} ${ANSI.white}This site was built with me.${ANSI.magenta}     │
-  │  ${ANSI.cyan}⚡${ANSI.magenta} ${ANSI.dim}opus-4-6 · agentic coding${ANSI.reset}${ANSI.magenta}       │
-  ╰─────────────────────────────────────╯${ANSI.reset}`;
+  return `
+${ANSI.magenta}╭──────────────────────────────────────────────╮${ANSI.reset}
+${ANSI.magenta}│${ANSI.reset} ${ANSI.magenta}✻${ANSI.reset} ${ANSI.bold}Welcome to Claude Code!${ANSI.reset}                    ${ANSI.magenta}│${ANSI.reset}
+${ANSI.magenta}│${ANSI.reset}                                              ${ANSI.magenta}│${ANSI.reset}
+${ANSI.magenta}│${ANSI.reset}   ${ANSI.dim}/help${ANSI.reset} for help                            ${ANSI.magenta}│${ANSI.reset}
+${ANSI.magenta}│${ANSI.reset}                                              ${ANSI.magenta}│${ANSI.reset}
+${ANSI.magenta}│${ANSI.reset}   ${ANSI.dim}cwd:${ANSI.reset} ~/Projects/otisscott.me              ${ANSI.magenta}│${ANSI.reset}
+${ANSI.magenta}╰──────────────────────────────────────────────╯${ANSI.reset}
+
+${ANSI.dim}  model: claude-opus-4-6${ANSI.reset}
+${ANSI.dim}  context: 200k tokens${ANSI.reset}
+
+${ANSI.green}  This site was built with Claude Code.${ANSI.reset}
+${ANSI.dim}  (But you can't run it here — this is a website.)${ANSI.reset}`;
 }
 
 export function codexCommand(): string {
-  return `${ANSI.dim}codex: command not found
-${ANSI.reset}${ANSI.yellow}Did you mean: ${ANSI.bold}claude${ANSI.reset}${ANSI.yellow}?${ANSI.reset}
-${ANSI.dim}(We use the good stuff around here)${ANSI.reset}`;
+  return `
+${ANSI.green}  ╔══════════════════════════════════════╗
+  ║${ANSI.reset}${ANSI.bold}${ANSI.white}  OpenAI Codex CLI                    ${ANSI.reset}${ANSI.green}║
+  ╚══════════════════════════════════════╝${ANSI.reset}
+
+  ${ANSI.dim}Model:${ANSI.reset} o4-mini
+  ${ANSI.dim}Working directory:${ANSI.reset} ~/Projects/otisscott.me
+  ${ANSI.dim}Approval:${ANSI.reset} suggest
+
+${ANSI.dim}  (This is a website, not a real terminal.)${ANSI.reset}`;
 }
 
 export function opencodeCommand(): string {
-  return `${ANSI.dim}opencode: command not found
-${ANSI.reset}${ANSI.yellow}Did you mean: ${ANSI.bold}claude${ANSI.reset}${ANSI.yellow}?${ANSI.reset}
-${ANSI.dim}(Nice try though)${ANSI.reset}`;
+  return `
+${ANSI.cyan}┌─────────────────────────────────────────┐
+│${ANSI.reset}${ANSI.bold}  opencode ${ANSI.reset}${ANSI.dim}v0.1${ANSI.reset}                           ${ANSI.cyan}│
+│${ANSI.reset}                                         ${ANSI.cyan}│
+│${ANSI.reset}  ${ANSI.dim}Provider:${ANSI.reset} anthropic                     ${ANSI.cyan}│
+│${ANSI.reset}  ${ANSI.dim}Model:${ANSI.reset}    claude-sonnet-4-5              ${ANSI.cyan}│
+│${ANSI.reset}  ${ANSI.dim}cwd:${ANSI.reset}      ~/Projects/otisscott.me       ${ANSI.cyan}│
+└─────────────────────────────────────────┘${ANSI.reset}
+
+${ANSI.dim}  (This is a website, not a real terminal.)${ANSI.reset}`;
 }
 
 // Package manager easter eggs
