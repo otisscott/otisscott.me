@@ -39,25 +39,36 @@ export function generateShortPrompt(): string {
 export function helpCommand(): string {
   return `${ANSI.bold}Available commands:${ANSI.reset}
 
-  ${ANSI.green}help${ANSI.reset}        - Show this help message
-  ${ANSI.green}clear${ANSI.reset}       - Clear the terminal
-  ${ANSI.green}date${ANSI.reset}        - Show current date and time
-  ${ANSI.green}echo${ANSI.reset}        - Print text to the terminal
+  ${ANSI.cyan}Navigation${ANSI.reset}
   ${ANSI.green}ls${ANSI.reset}          - List directory contents
   ${ANSI.green}cd${ANSI.reset}          - Change directory
   ${ANSI.green}pwd${ANSI.reset}         - Print working directory
   ${ANSI.green}cat${ANSI.reset}         - Display file contents
+  ${ANSI.green}tree${ANSI.reset}        - Show directory tree
+  ${ANSI.green}grep${ANSI.reset}        - Search file contents
+  ${ANSI.green}open${ANSI.reset}        - Open URL from file
+
+  ${ANSI.cyan}Portfolio${ANSI.reset}
   ${ANSI.green}whoami${ANSI.reset}      - Display user information
   ${ANSI.green}skills${ANSI.reset}      - Display technical skills
   ${ANSI.green}experience${ANSI.reset}  - List work history
   ${ANSI.green}contact${ANSI.reset}     - Display contact information
   ${ANSI.green}projects${ANSI.reset}    - List all projects
+
+  ${ANSI.cyan}Tools${ANSI.reset}
+  ${ANSI.green}help${ANSI.reset}        - Show this help message
+  ${ANSI.green}clear${ANSI.reset}       - Clear the terminal
+  ${ANSI.green}echo${ANSI.reset}        - Print text to the terminal
+  ${ANSI.green}date${ANSI.reset}        - Show current date and time
+  ${ANSI.green}history${ANSI.reset}     - Show command history
+  ${ANSI.green}ping${ANSI.reset}        - Ping a host
+  ${ANSI.green}theme${ANSI.reset}       - Change color theme
   ${ANSI.green}gs${ANSI.reset}          - Show git status
   ${ANSI.green}gl${ANSI.reset}          - Show git log
   ${ANSI.green}neofetch${ANSI.reset}    - Display system info
   ${ANSI.green}cowsay${ANSI.reset}      - ASCII cow says a message
 
-${ANSI.dim}Tip: Use Tab for command and path completion${ANSI.reset}`;
+${ANSI.dim}Tip: Use Tab for autocomplete, try ${ANSI.reset}${ANSI.green}sl${ANSI.reset}${ANSI.dim} for a surprise${ANSI.reset}`;
 }
 
 // LS command with flags
@@ -366,6 +377,150 @@ export function dateCommand(): string {
   return new Date().toString();
 }
 
+// Sudo command
+export function sudoCommand(args: string[]): string {
+  if (args.length === 0) {
+    return `${ANSI.red}usage: sudo <command>${ANSI.reset}`;
+  }
+  return `${ANSI.yellow}[sudo] password for otis: ************
+${ANSI.red}otis is not in the sudoers file. This incident will be reported.${ANSI.reset}`;
+}
+
+// Vim command
+export function vimCommand(): string {
+  return `
+${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}
+${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}
+${ANSI.bold}${ANSI.white}~                 VIM - Vi IMproved                  ${ANSI.reset}
+${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}
+${ANSI.bold}${ANSI.white}~             type :q! to exit${ANSI.reset}${ANSI.dim} (just kidding)${ANSI.reset}
+${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}
+${ANSI.bold}${ANSI.white}~         ${ANSI.reset}${ANSI.green}You've been trapped. There is no escape.${ANSI.reset}
+${ANSI.bold}${ANSI.white}~         ${ANSI.reset}${ANSI.dim}Press any key to continue...${ANSI.reset}
+${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}`;
+}
+
+// Exit command
+export function exitCommand(): string {
+  return `${ANSI.magenta}There is no escape. You live here now.${ANSI.reset}
+${ANSI.dim}(This is a website, not a real terminal)${ANSI.reset}`;
+}
+
+// Ping command
+export function pingCommand(args: string[]): string {
+  const host = args[0] || 'otisscott.me';
+  const lines: string[] = [];
+  lines.push(`PING ${host} (127.0.0.1): 56 data bytes`);
+  for (let i = 0; i < 4; i++) {
+    const ms = (Math.random() * 15 + 3).toFixed(1);
+    lines.push(`64 bytes from 127.0.0.1: icmp_seq=${i} ttl=64 time=${ms} ms`);
+  }
+  lines.push('');
+  lines.push(`--- ${host} ping statistics ---`);
+  lines.push(`4 packets transmitted, 4 packets received, 0.0% packet loss`);
+  return lines.join('\n');
+}
+
+// Tree command
+export function treeCommand(args: string[]): string {
+  const pathArg = args.find(arg => !arg.startsWith('-'));
+  const result = lsCommand(['--tree', ...(pathArg ? [pathArg] : [])]);
+  const dirName = pathArg || '.';
+  return `${ANSI.cyan}${dirName}${ANSI.reset}\n${result}`;
+}
+
+// Grep command
+export function grepCommand(args: string[]): string {
+  if (args.length < 1) {
+    return `${ANSI.red}usage: grep <pattern> [path]${ANSI.reset}`;
+  }
+
+  const pattern = args[0];
+  const searchPath = args[1];
+  const results: string[] = [];
+
+  function searchNode(node: FileNode | DirectoryNode, path: string) {
+    if (node.type === 'file') {
+      const lines = node.content.split('\n');
+      lines.forEach((line, i) => {
+        if (line.toLowerCase().includes(pattern.toLowerCase())) {
+          const highlighted = line.replace(
+            new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+            match => `${ANSI.red}${ANSI.bold}${match}${ANSI.reset}`
+          );
+          results.push(`${ANSI.magenta}${path}${ANSI.reset}:${ANSI.green}${i + 1}${ANSI.reset}: ${highlighted}`);
+        }
+      });
+    } else {
+      for (const [name, child] of node.children) {
+        if (!name.startsWith('.')) {
+          const childPath = path ? `${path}/${name}` : name;
+          searchNode(child as FileNode | DirectoryNode, childPath);
+        }
+      }
+    }
+  }
+
+  const startNode = searchPath ? fileSystem.getNodeAtPath(searchPath) : fileSystem.getNodeAtPath('.');
+  if (!startNode) {
+    setExitCode(1);
+    return `${ANSI.red}grep: ${searchPath}: No such file or directory${ANSI.reset}`;
+  }
+
+  searchNode(startNode as FileNode | DirectoryNode, searchPath === '.' || !searchPath ? '' : searchPath);
+
+  if (results.length === 0) {
+    return `${ANSI.dim}No matches found for "${pattern}"${ANSI.reset}`;
+  }
+
+  return results.join('\n');
+}
+
+// History command
+export function historyCommand(history: string[]): string {
+  if (history.length === 0) {
+    return `${ANSI.dim}No commands in history${ANSI.reset}`;
+  }
+  return history
+    .map((cmd, i) => `  ${ANSI.dim}${String(i + 1).padStart(4)}${ANSI.reset}  ${cmd}`)
+    .join('\n');
+}
+
+// Open command - returns URL to open or error message
+export function openCommand(args: string[]): { output: string; url?: string } {
+  if (args.length === 0) {
+    return { output: `${ANSI.red}usage: open <file|url>${ANSI.reset}` };
+  }
+
+  const target = args[0];
+
+  // Direct URL
+  if (target.startsWith('http://') || target.startsWith('https://')) {
+    return { output: `${ANSI.green}Opening ${target}...${ANSI.reset}`, url: target };
+  }
+
+  // Read file and look for URLs
+  const content = fileSystem.readFile(target);
+  if (!content) {
+    setExitCode(1);
+    return { output: `${ANSI.red}open: ${target}: No such file${ANSI.reset}` };
+  }
+
+  const urlMatch = content.match(/https?:\/\/[^\s)]+/);
+  if (urlMatch) {
+    return { output: `${ANSI.green}Opening ${urlMatch[0]}...${ANSI.reset}`, url: urlMatch[0] };
+  }
+
+  // Look for partial URLs like github.com/...
+  const partialMatch = content.match(/(?:github\.com|linkedin\.com|dataearn\.com)[^\s)]+/);
+  if (partialMatch) {
+    const url = `https://${partialMatch[0]}`;
+    return { output: `${ANSI.green}Opening ${url}...${ANSI.reset}`, url };
+  }
+
+  return { output: `${ANSI.dim}No URL found in ${target}${ANSI.reset}` };
+}
+
 // Tab completion
 export function getCompletions(input: string): { completions: string[]; prefix: string } {
   const trimmed = input.trim();
@@ -375,8 +530,9 @@ export function getCompletions(input: string): { completions: string[]; prefix: 
   if (parts.length === 1 && !trimmed.includes(' ')) {
     const commands = [
       'help', 'clear', 'date', 'echo', 'ls', 'cd', 'pwd', 'cat',
-      'whoami', 'skills', 'experience', 'contact', 'projects',
-      'gs', 'gl', 'neofetch', 'cowsay'
+      'tree', 'grep', 'open', 'whoami', 'skills', 'experience',
+      'contact', 'projects', 'history', 'ping', 'theme',
+      'gs', 'gl', 'neofetch', 'cowsay', 'sudo', 'vim', 'exit', 'sl', 'rm',
     ];
     const matches = commands.filter(cmd => cmd.startsWith(trimmed));
     return { completions: matches, prefix: '' };
