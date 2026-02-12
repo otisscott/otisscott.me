@@ -33,6 +33,10 @@ import {
   grepCommand,
   historyCommand,
   openCommand,
+  claudeCommand,
+  codexCommand,
+  opencodeCommand,
+  packageManagerCommand,
   getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
@@ -326,6 +330,23 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
             startSl(getTerminalContext());
             return;
           }
+          break;
+        case 'claude':
+        case 'claude-code':
+          writeOutput(claudeCommand());
+          break;
+        case 'codex':
+          writeOutput(codexCommand());
+          break;
+        case 'opencode':
+          writeOutput(opencodeCommand());
+          break;
+        case 'npm':
+        case 'npx':
+        case 'bun':
+        case 'bunx':
+        case 'uv':
+          writeOutput(packageManagerCommand(cmd));
           break;
         default:
           setExitCode(1);
