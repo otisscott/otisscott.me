@@ -6,6 +6,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { xtermTheme } from '@/lib/theme/tokyo-night';
+import { themes, themeNames } from '@/lib/theme/themes';
 import {
   generatePrompt,
   generateShortPrompt,
@@ -25,6 +26,14 @@ import {
   cowsayCommand,
   echoCommand,
   dateCommand,
+  sudoCommand,
+  vimCommand,
+  exitCommand,
+  pingCommand,
+  treeCommand,
+  grepCommand,
+  historyCommand,
+  openCommand,
   getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
@@ -47,6 +56,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const tabPressCountRef = useRef(0);
   const lastTabInputRef = useRef('');
   const ghostTextRef = useRef('');
+  const currentThemeRef = useRef('tokyo-night');
 
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
@@ -222,6 +232,152 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         case 'cowsay':
           writeOutput(cowsayCommand(args));
           break;
+        case 'sudo':
+          writeOutput(sudoCommand(args));
+          break;
+        case 'vim':
+        case 'vi':
+        case 'nano':
+          writeOutput(vimCommand());
+          break;
+        case 'exit':
+        case 'quit':
+        case 'logout':
+          writeOutput(exitCommand());
+          break;
+        case 'ping':
+          writeOutput(pingCommand(args));
+          break;
+        case 'tree':
+          writeOutput(treeCommand(args));
+          break;
+        case 'grep':
+          writeOutput(grepCommand(args));
+          break;
+        case 'history':
+          writeOutput(historyCommand(commandHistoryRef.current));
+          break;
+        case 'open': {
+          const result = openCommand(args);
+          writeOutput(result.output);
+          if (result.url) {
+            window.open(result.url, '_blank');
+          }
+          break;
+        }
+        case 'theme': {
+          const themeName = args[0];
+          if (!themeName) {
+            const current = currentThemeRef.current;
+            let list = `${ANSI.bold}Available themes:${ANSI.reset}\n\n`;
+            for (const name of themeNames) {
+              const marker = name === current ? ` ${ANSI.green}(active)${ANSI.reset}` : '';
+              list += `  ${ANSI.cyan}${name}${ANSI.reset}${marker}\n`;
+            }
+            list += `\n${ANSI.dim}Usage: theme <name>${ANSI.reset}`;
+            writeOutput(list);
+          } else if (themes[themeName]) {
+            const t = themes[themeName];
+            if (xtermRef.current) {
+              xtermRef.current.options.theme = t.xterm;
+            }
+            document.documentElement.style.setProperty('--bg-primary', t.css.bgPrimary);
+            document.documentElement.style.setProperty('--bg-secondary', t.css.bgSecondary);
+            document.documentElement.style.setProperty('--bg-tertiary', t.css.bgTertiary);
+            currentThemeRef.current = themeName;
+            writeOutput(`${ANSI.green}Switched to ${t.name}${ANSI.reset}`);
+          } else {
+            setExitCode(1);
+            writeOutput(`${ANSI.red}theme: unknown theme '${themeName}'. Try 'theme' to list.${ANSI.reset}`);
+          }
+          break;
+        }
+        case 'rm': {
+          const fullArgs = args.join(' ');
+          if (fullArgs.includes('-rf') && (fullArgs.includes('/') || fullArgs.includes('~'))) {
+            // Animated fake deletion
+            const term = xtermRef.current;
+            if (term) {
+              const files = [
+                'about/whoami.txt', 'about/bio.md', 'work/skills.json',
+                'work/experience/director-of-tech.md', 'contact/email.txt',
+                'projects/vault-os.md', 'projects/dataearn.md',
+                'education/nyu.md', 'misc/now.txt', '/',
+              ];
+              let i = 0;
+              const interval = setInterval(() => {
+                if (i < files.length) {
+                  term.write(`\r\n${ANSI.red}rm: removing ${files[i]}${ANSI.reset}`);
+                  i++;
+                } else {
+                  clearInterval(interval);
+                  term.write(`\r\n\r\n${ANSI.green}Just kidding. Nice try though.${ANSI.reset}`);
+                  inputBufferRef.current = '';
+                  cursorPositionRef.current = 0;
+                  tabPressCountRef.current = 0;
+                  writePrompt();
+                }
+              }, 150);
+              return; // Skip the writePrompt below
+            }
+          } else {
+            writeOutput(`${ANSI.red}rm: permission denied${ANSI.reset}`);
+          }
+          break;
+        }
+        case 'sl': {
+          // Steam locomotive animation
+          const term = xtermRef.current;
+          if (term) {
+            const train = [
+              '      ====        ________                ___________',
+              '  _D _|  |_______/        \\__I_I_____===__|_________|',
+              '   |(_)---  |   H\\________/ |   |        =|___ ___|',
+              '   /     |  |   H  |  |     |   |         ||_| |_||',
+              '  |      |  |   H  |__--------------------| [___] |',
+              '  (      |  |   H  //[]---~\\\\_________|     |     |',
+              '  /\\\\______|__|___H_//  |    |    \\\\_______|     |',
+              ' /                 |      |    |    \\               |',
+              '~~~~~~~~~~~~~~~~~~~~~IIIIIIII~~~~~~~~~~~~~IIIIIIII~~~~',
+            ];
+            const trainWidth = Math.max(...train.map(l => l.length));
+            const cols = term.cols;
+            let pos = cols;
+            let firstFrame = true;
+
+            const interval = setInterval(() => {
+              if (!firstFrame) {
+                term.write(`\x1b[${train.length}A`);
+              }
+              firstFrame = false;
+
+              for (const line of train) {
+                let visible = '';
+                for (let col = 0; col < cols; col++) {
+                  const trainCol = col - pos;
+                  if (trainCol >= 0 && trainCol < line.length) {
+                    visible += line[trainCol];
+                  } else {
+                    visible += ' ';
+                  }
+                }
+                term.write(`\r${ANSI.green}${visible}${ANSI.reset}\r\n`);
+              }
+
+              pos -= 3;
+
+              if (pos < -trainWidth) {
+                clearInterval(interval);
+                inputBufferRef.current = '';
+                cursorPositionRef.current = 0;
+                tabPressCountRef.current = 0;
+                writePrompt();
+              }
+            }, 60);
+            return; // Skip the writePrompt below
+          }
+          break;
+        }
         default:
           setExitCode(1);
           writeOutput(`${ANSI.red}zsh: command not found: ${cmd}${ANSI.reset}`);
