@@ -27,7 +27,6 @@ import {
   echoCommand,
   dateCommand,
   sudoCommand,
-  vimCommand,
   exitCommand,
   pingCommand,
   treeCommand,
@@ -57,6 +56,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const lastTabInputRef = useRef('');
   const ghostTextRef = useRef('');
   const currentThemeRef = useRef('tokyo-night');
+  const interactiveModeRef = useRef<(() => void) | null>(null);
 
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
@@ -237,9 +237,50 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           break;
         case 'vim':
         case 'vi':
-        case 'nano':
-          writeOutput(vimCommand());
+        case 'nano': {
+          const term = xtermRef.current;
+          if (term) {
+            // Clear screen and draw vim UI
+            term.write('\x1b[2J\x1b[H'); // clear + cursor home
+            const rows = term.rows;
+            const cols = term.cols;
+            for (let r = 0; r < rows - 1; r++) {
+              if (r === Math.floor(rows / 2) - 2) {
+                const line = 'VIM - Vi IMproved';
+                const pad = Math.max(0, Math.floor((cols - line.length) / 2));
+                term.write(`${ANSI.bold}${ANSI.white}~${' '.repeat(pad - 1)}${line}${ANSI.reset}\r\n`);
+              } else if (r === Math.floor(rows / 2)) {
+                const line = 'type :q! to exit (just kidding)';
+                const pad = Math.max(0, Math.floor((cols - line.length) / 2));
+                term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}${' '.repeat(pad - 1)}${line}\r\n`);
+              } else if (r === Math.floor(rows / 2) + 2) {
+                const line = "You've been trapped. There is no escape.";
+                const pad = Math.max(0, Math.floor((cols - line.length) / 2));
+                term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}${' '.repeat(pad - 1)}${ANSI.green}${line}${ANSI.reset}\r\n`);
+              } else if (r === Math.floor(rows / 2) + 3) {
+                const line = 'Press any key to continue...';
+                const pad = Math.max(0, Math.floor((cols - line.length) / 2));
+                term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}${' '.repeat(pad - 1)}${ANSI.dim}${line}${ANSI.reset}\r\n`);
+              } else {
+                term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}\r\n`);
+              }
+            }
+            // Status bar at bottom
+            term.write(`${ANSI.bold}${ANSI.white}\x1b[7m -- INSERT --${' '.repeat(Math.max(0, cols - 13))}\x1b[27m${ANSI.reset}`);
+
+            // Set interactive mode — any keypress restores terminal
+            interactiveModeRef.current = () => {
+              term.write('\x1b[2J\x1b[H'); // clear screen
+              term.writeln(`${ANSI.dim}(Escaped from vim. You're one of the lucky ones.)${ANSI.reset}`);
+              inputBufferRef.current = '';
+              cursorPositionRef.current = 0;
+              tabPressCountRef.current = 0;
+              writePrompt();
+            };
+            return; // Skip normal prompt
+          }
           break;
+        }
         case 'exit':
         case 'quit':
         case 'logout':
@@ -491,6 +532,14 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     window.addEventListener('resize', handleWindowResize);
 
     term.onData((data) => {
+      // Interactive mode intercept (e.g., vim "press any key")
+      if (interactiveModeRef.current) {
+        const exit = interactiveModeRef.current;
+        interactiveModeRef.current = null;
+        exit();
+        return;
+      }
+
       const code = data.charCodeAt(0);
 
       // Save and clear ghost text before processing input
