@@ -6,7 +6,7 @@
  */
 
 import { Terminal as XTerm } from '@xterm/xterm';
-import { ANSI } from '@/lib/filesystem/types';
+import { ANSI, padEndVisible } from '@/lib/filesystem/types';
 
 interface TerminalContext {
   term: XTerm;
@@ -199,4 +199,240 @@ export function startRmRf(ctx: TerminalContext): void {
       writePrompt();
     }
   }, 150);
+}
+
+// ─── AI Tool Interactive Sessions ───────────────────────────────────
+
+const ORANGE = '\x1b[38;5;208m';
+
+const aiResponses = [
+  "I'm flattered, but I'm just an easter egg on a portfolio site.",
+  "I'd love to help, but I'm not actually connected to anything.",
+  "Try the real thing — this is just a tribute.",
+  "404: Intelligence not found. This is a static website.",
+  "I appreciate the effort, but I'm purely decorative.",
+  "You're typing into the void. A very pretty void, though.",
+  "This prompt goes nowhere. Like my hopes of being a real AI.",
+  "I'm about as useful as a screen door on a submarine right now.",
+];
+
+interface AiToolConfig {
+  name: string;
+  exitHint: string;
+  promptChar: string;
+  promptColor: string;
+  renderHeader: (cols: number) => string[];
+}
+
+function startAiSession(ctx: TerminalContext, config: AiToolConfig): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+  const cols = term.cols;
+  let inputBuf = '';
+  let responseIdx = 0;
+
+  const drawScreen = (extraLines?: string[]) => {
+    term.write('\x1b[2J\x1b[H');
+    const headerLines = config.renderHeader(cols);
+    for (const line of headerLines) {
+      term.write(line + '\r\n');
+    }
+    if (extraLines) {
+      for (const line of extraLines) {
+        term.write(line + '\r\n');
+      }
+    }
+    // Input prompt
+    term.write(`\r\n${config.promptColor}${config.promptChar}${ANSI.reset} ${inputBuf}`);
+  };
+
+  const exitSession = () => {
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H');
+    term.writeln(`${ANSI.dim}(Exited ${config.name})${ANSI.reset}`);
+    resetInput();
+    writePrompt();
+  };
+
+  drawScreen();
+
+  setInteractiveMode((data: string) => {
+    const code = data.charCodeAt(0);
+
+    if (code === 3) {
+      // Ctrl+C
+      exitSession();
+      return;
+    }
+
+    if (code === 13) {
+      // Enter
+      const cmd = inputBuf.trim();
+      if (cmd === '/exit' || cmd === 'exit' || cmd === 'quit' || cmd === '/quit') {
+        exitSession();
+        return;
+      }
+      if (cmd) {
+        const response = aiResponses[responseIdx % aiResponses.length];
+        responseIdx++;
+        inputBuf = '';
+        drawScreen([
+          '',
+          `${ANSI.dim}> ${cmd}${ANSI.reset}`,
+          '',
+          `${ANSI.white}${response}${ANSI.reset}`,
+        ]);
+      } else {
+        inputBuf = '';
+        drawScreen();
+      }
+      return;
+    }
+
+    if (code === 127) {
+      // Backspace
+      if (inputBuf.length > 0) {
+        inputBuf = inputBuf.slice(0, -1);
+        term.write('\b \b');
+      }
+      return;
+    }
+
+    if (code >= 32 && code < 127) {
+      inputBuf += data;
+      term.write(data);
+    }
+  });
+}
+
+/**
+ * Claude Code interactive session
+ */
+export function startClaude(ctx: TerminalContext): void {
+  const cols = ctx.term.cols;
+  startAiSession(ctx, {
+    name: 'Claude Code',
+    exitHint: '/exit or Ctrl+C',
+    promptChar: '❯',
+    promptColor: ORANGE,
+    renderHeader: (c) => {
+      const W = Math.max(60, c - 2);
+      const LW = Math.min(34, Math.floor(W * 0.4));
+      const RW = W - LW - 1;
+      const o = ORANGE;
+      const r = ANSI.reset;
+      const row = (left: string, right: string) =>
+        `${o}│${r}${padEndVisible(left, LW)}${o}│${r}${padEndVisible(right, RW)}${o}│${r}`;
+
+      const titleText = '─── Claude Code v2.1.39 ';
+      const topFill = Math.max(0, W - titleText.length - 1);
+
+      return [
+        `${o}╭${titleText}${'─'.repeat(topFill)}╮${r}`,
+        row('', ` ${ANSI.bold}Tips for getting started${r}`),
+        row(`      ${ANSI.bold}Welcome back, Otis!${r}`, ` Run ${ANSI.cyan}/init${r} to create a CLAUDE.md file`),
+        row('', ` with instructions for Claude`),
+        row('', ` ${ANSI.dim}${'─'.repeat(RW - 2)}${r}`),
+        row(`${' '.repeat(Math.max(0, Math.floor((LW - 7) / 2)))}${ANSI.magenta}▐▛███▜▌${r}`, ` ${ANSI.dim}Recent activity${r}`),
+        row(`${' '.repeat(Math.max(0, Math.floor((LW - 9) / 2)))}${ANSI.magenta}▝▜█████▛▘${r}`, ` ${ANSI.dim}No recent activity${r}`),
+        row(`${' '.repeat(Math.max(0, Math.floor((LW - 6) / 2)))}${ANSI.magenta}▘▘ ▝▝${r}`, ''),
+        row(`${' '.repeat(Math.max(0, Math.floor((LW - 21) / 2)))}${ANSI.dim}Opus 4.6 · Claude Max${r}`, ''),
+        row(`${' '.repeat(Math.max(0, Math.floor((LW - 23) / 2)))}${ANSI.dim}~/Projects/otisscott.me${r}`, ''),
+        `${o}╰${'─'.repeat(W)}╯${r}`,
+      ];
+    },
+  });
+}
+
+/**
+ * OpenAI Codex interactive session
+ */
+export function startCodex(ctx: TerminalContext): void {
+  startAiSession(ctx, {
+    name: 'Codex',
+    exitHint: '/exit or Ctrl+C',
+    promptChar: '>',
+    promptColor: ANSI.green,
+    renderHeader: (c) => {
+      const d = ANSI.dim;
+      const r = ANSI.reset;
+      const W = Math.max(40, Math.min(58, c - 4));
+      const row = (content: string) =>
+        `${d}│${r} ${padEndVisible(content, W)}${d} │${r}`;
+      const topFill = Math.max(0, W + 2 - 3);
+
+      return [
+        `${d}╭── ${'─'.repeat(topFill - 1)}╮${r}`,
+        row(`${d}>_${r} ${ANSI.bold}OpenAI Codex${r} ${d}(v0.1.2503262313)${r}`),
+        row(''),
+        row(`${d}model:     ${r}o4-mini   ${d}/model${ANSI.cyan} to change${r}`),
+        row(`${d}directory: ${r}~/Projects/otisscott.me`),
+        `${d}╰${'─'.repeat(W + 2)}╯${r}`,
+      ];
+    },
+  });
+}
+
+/**
+ * OpenCode interactive session
+ */
+export function startOpencode(ctx: TerminalContext): void {
+  const cols = ctx.term.cols;
+  startAiSession(ctx, {
+    name: 'opencode',
+    exitHint: '/exit or Ctrl+C',
+    promptChar: '>',
+    promptColor: ANSI.cyan,
+    renderHeader: (c) => {
+      const r = ANSI.reset;
+      const d = ANSI.dim;
+      const gray = '\x1b[90m';
+      const shadow1 = '\x1b[38;5;235m';
+      const bg1 = '\x1b[48;5;235m';
+      const shadow2 = '\x1b[38;5;238m';
+      const bg2 = '\x1b[48;5;238m';
+
+      const logoLeft = [
+        '                   ',
+        '█▀▀█ █▀▀█ █▀▀█ █▀▀▄',
+        '█__█ █__█ █^^^ █__█',
+        '▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀',
+      ];
+      const logoRight = [
+        '             ▄     ',
+        '█▀▀▀ █▀▀█ █▀▀█ █▀▀█',
+        '█___ █__█ █__█ █^^^',
+        '▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀',
+      ];
+
+      const drawLine = (line: string, fg: string, shadow: string, bg: string) => {
+        let out = '';
+        for (const ch of line) {
+          if (ch === '_') { out += `${bg} ${r}`; continue; }
+          if (ch === '^') { out += `${fg}${bg}▀${r}`; continue; }
+          if (ch === '~') { out += `${shadow}▀${r}`; continue; }
+          if (ch === ' ') { out += ' '; continue; }
+          out += `${fg}${ch}${r}`;
+        }
+        return out;
+      };
+
+      const logoLines: string[] = [];
+      for (let i = 0; i < logoLeft.length; i++) {
+        const left = drawLine(logoLeft[i], gray, shadow1, bg1);
+        const right = drawLine(logoRight[i], r, shadow2, bg2);
+        const pad = ' '.repeat(Math.max(0, Math.floor((c - 41) / 2)));
+        logoLines.push(pad + left + ' ' + right);
+      }
+
+      const dir = '~/Projects/otisscott.me';
+      const ver = 'v0.2.22';
+      const statusGap = Math.max(1, c - dir.length - ver.length - 4);
+
+      return [
+        ...logoLines,
+        '',
+        `${d}  ${dir}${' '.repeat(statusGap)}${ver}${r}`,
+      ];
+    },
+  });
 }
