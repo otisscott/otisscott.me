@@ -26,8 +26,8 @@ A terminal-emulated personal website built with Next.js, TypeScript, and xterm.j
 ## Getting Started
 
 ```bash
-npm install
-npm run dev
+bun install
+bun dev
 # Open http://localhost:3000
 ```
 
