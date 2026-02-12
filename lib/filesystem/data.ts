@@ -54,7 +54,7 @@ export const rootDirectory = createDirectory('', [
 ║  Co-Founder & Engineer @ DataEarn                              ║
 ║                                                                ║
 ║  NYU CS '22 · Building at the intersection of wine & tech.     ║
-║  Turning a 40-year-old wine business into a software company.  ║
+║  Turning a 20-year-old wine business into a software company.  ║
 ║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝`),
     createFile('bio.md', `# About Me
@@ -67,7 +67,7 @@ I studied Computer Science at **NYU** (BS '22) and have been writing code since 
 
 ## What I Do Now
 
-I'm the **Director of Technology** at **Manhattan Wine Company**, a 40-year-old fine wine storage and logistics company in NYC. I'm building **Cellar OS** — a full-stack SaaS platform to modernize how the company manages wine inventory, client accounts, and warehouse operations.
+I'm the **Director of Technology** at **Manhattan Wine Company**, a 20-year-old fine wine storage and logistics company in NYC. I'm building **Vault OS** under **The American Storage Company** (my LLC) — a full-stack SaaS platform to modernize how the company manages wine inventory, client accounts, and warehouse operations.
 
 I also build **Shopify apps** for wine merchants — tools for LWIN-based inventory mapping, appraisals, and catalog management.
 
@@ -80,13 +80,15 @@ I also build **Shopify apps** for wine merchants — tools for LWIN-based invent
     createFile('interests.txt', `Things I'm Into:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+• Traveling & backpacking
+• Boating & fishing
+• Cooking
+• Woodworking
+• Audio equipment
 • Wine industry technology
 • AI/ML and developer tooling
-• Full-stack web development
 • Neovim & terminal workflows
-• Open source software
-• Shopify app development
-• Data systems & automation`),
+• Quality time with my girlfriend Clementine and cat Momo`),
   ]),
   createDirectory('work', [
     createDirectory('experience', [
@@ -142,12 +144,12 @@ New York, NY`),
 
 📅 October 2024 - September 2025
 
-Joined the family wine business to modernize operations. Started by handling sales while scoping the technology needs of a 40-year-old company.
+Joined the family wine business to modernize operations. Started by handling sales while scoping the technology needs of a 20-year-old company.
 
 ### What I Did
 - Managed client relationships and wine sales operations
 - Audited existing systems and identified automation opportunities
-- Began prototyping Cellar OS for inventory and warehouse management
+- Began prototyping Vault OS for inventory and warehouse management
 - Earned WSET Level 2 certification
 
 ### Technologies
@@ -157,10 +159,10 @@ Python, Django, PostgreSQL, Shopify`),
 
 📅 September 2025 - Present
 
-Leading technology strategy and building Cellar OS — a full-stack platform to run the wine storage, logistics, and sales operations.
+Leading technology strategy and building Vault OS — a full-stack platform to run the wine storage, logistics, and sales operations.
 
 ### What I'm Building
-- Cellar OS: inventory management, client portals, warehouse operations
+- Vault OS: inventory management, client portals, warehouse operations
 - Shopify apps for wine merchants (LWIN mapping, appraisals)
 - Data integrations with third-party wine databases
 - Internal tooling for warehouse staff and sales team
@@ -258,9 +260,9 @@ For inquiries about:
     }, null, 2)),
   ]),
   createDirectory('projects', [
-    createFile('cellar-os.md', `# Cellar OS
+    createFile('vault-os.md', `# Vault OS
 
-Fine asset management SaaS for Manhattan Wine Company.
+Fine asset management SaaS built by The American Storage Company for Manhattan Wine Company.
 
 ## What It Does
 - Wine inventory tracking with LWIN integration
@@ -381,7 +383,7 @@ This is a hidden file that only appears with ls -a`),
 What I'm currently focused on:
 
 ## Work
-• Building Cellar OS at Manhattan Wine Company
+• Building Vault OS at Manhattan Wine Company
 • Shopify app development for wine merchants
 • Modernizing warehouse operations with software
 
