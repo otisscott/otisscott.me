@@ -67,6 +67,12 @@ export function helpCommand(): string {
   ${ANSI.green}gl${ANSI.reset}          - Show git log
   ${ANSI.green}neofetch${ANSI.reset}    - Display system info
   ${ANSI.green}cowsay${ANSI.reset}      - ASCII cow says a message
+  ${ANSI.green}man${ANSI.reset}         - Display manual pages
+  ${ANSI.green}cal${ANSI.reset}         - Show calendar
+  ${ANSI.green}scp${ANSI.reset}         - Secure file copy
+  ${ANSI.green}todo${ANSI.reset}        - Personal todo list
+  ${ANSI.green}alias${ANSI.reset}       - Define command aliases
+  ${ANSI.green}jobs${ANSI.reset}        - List background jobs
 
 ${ANSI.dim}Tip: Use Tab for autocomplete, try ${ANSI.reset}${ANSI.green}sl${ANSI.reset}${ANSI.dim} for a surprise${ANSI.reset}`;
 }
@@ -775,6 +781,267 @@ ${ANSI.dim}No Python environment here though — just vibes.${ANSI.reset}`,
   return msgs[cmd] || `${ANSI.red}${cmd}: command not found${ANSI.reset}`;
 }
 
+// Man command — looks up pages from man-pages.ts
+import { manPages } from './man-pages';
+
+export function manCommand(args: string[]): string {
+  const page = args[0];
+  if (!page) {
+    return `What manual page do you want?`;
+  }
+  return manPages[page] || `No manual entry for ${page}`;
+}
+
+// Cal command — display current month calendar
+export function calCommand(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  const header = `${monthNames[month]} ${year}`;
+  const dayHeader = 'Su Mo Tu We Th Fr Sa';
+
+  // Center the month/year header over the day header (20 chars wide)
+  const pad = Math.max(0, Math.floor((20 - header.length) / 2));
+  let output = ' '.repeat(pad) + header + '\n' + dayHeader + '\n';
+
+  // First day of month (0=Sun, 6=Sat)
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  let line = '   '.repeat(firstDay);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayStr = String(d).padStart(2);
+    if (d === today) {
+      line += `\x1b[7m${dayStr}\x1b[27m`;
+    } else {
+      line += dayStr;
+    }
+
+    if ((firstDay + d) % 7 === 0) {
+      output += line + '\n';
+      line = '';
+    } else {
+      line += ' ';
+    }
+  }
+  if (line.trim()) {
+    output += line;
+  }
+
+  return output;
+}
+
+// Todo command — localStorage-backed todo list
+interface TodoItem { text: string; done: boolean }
+
+function loadTodos(): TodoItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('otisscott-terminal-todos');
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveTodos(todos: TodoItem[]): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('otisscott-terminal-todos', JSON.stringify(todos));
+}
+
+export function todoCommand(args: string[]): string {
+  const sub = args[0];
+
+  if (!sub || sub === 'list') {
+    const todos = loadTodos();
+    if (todos.length === 0) {
+      return `${ANSI.dim}No todos yet. Add one with: todo add <text>${ANSI.reset}`;
+    }
+    return todos.map((t, i) => {
+      if (t.done) {
+        return `  ${ANSI.dim}${i + 1}. ${ANSI.green}☑${ANSI.reset} ${ANSI.dim}${ANSI.strikethrough}${t.text}${ANSI.reset}`;
+      }
+      return `  ${i + 1}. ☐ ${t.text}`;
+    }).join('\n');
+  }
+
+  if (sub === 'add') {
+    const text = args.slice(1).join(' ');
+    if (!text) return `${ANSI.red}usage: todo add <text>${ANSI.reset}`;
+    const todos = loadTodos();
+    todos.push({ text, done: false });
+    saveTodos(todos);
+    return `${ANSI.green}Added:${ANSI.reset} ${text}`;
+  }
+
+  if (sub === 'done') {
+    const idx = parseInt(args[1]) - 1;
+    const todos = loadTodos();
+    if (isNaN(idx) || idx < 0 || idx >= todos.length) {
+      return `${ANSI.red}Invalid index. Use 'todo' to see the list.${ANSI.reset}`;
+    }
+    todos[idx].done = true;
+    saveTodos(todos);
+    return `${ANSI.green}☑${ANSI.reset} ${ANSI.dim}${ANSI.strikethrough}${todos[idx].text}${ANSI.reset}`;
+  }
+
+  if (sub === 'rm') {
+    const idx = parseInt(args[1]) - 1;
+    const todos = loadTodos();
+    if (isNaN(idx) || idx < 0 || idx >= todos.length) {
+      return `${ANSI.red}Invalid index. Use 'todo' to see the list.${ANSI.reset}`;
+    }
+    const removed = todos.splice(idx, 1)[0];
+    saveTodos(todos);
+    return `${ANSI.red}Removed:${ANSI.reset} ${removed.text}`;
+  }
+
+  if (sub === 'clear') {
+    const todos = loadTodos().filter(t => !t.done);
+    const cleared = loadTodos().length - todos.length;
+    saveTodos(todos);
+    return cleared > 0
+      ? `${ANSI.green}Cleared ${cleared} completed item${cleared !== 1 ? 's' : ''}.${ANSI.reset}`
+      : `${ANSI.dim}No completed items to clear.${ANSI.reset}`;
+  }
+
+  return `${ANSI.red}usage: todo [list|add|done|rm|clear]${ANSI.reset}`;
+}
+
+// Alias helpers — localStorage-backed aliases
+export function loadAliases(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('otisscott-terminal-aliases');
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveAliases(aliases: Record<string, string>): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('otisscott-terminal-aliases', JSON.stringify(aliases));
+}
+
+export function aliasCommand(args: string[]): string {
+  if (args.length === 0) {
+    const aliases = loadAliases();
+    const keys = Object.keys(aliases);
+    if (keys.length === 0) {
+      return `${ANSI.dim}No aliases defined. Set one with: alias name='command'${ANSI.reset}`;
+    }
+    return keys.map(k => `alias ${k}='${aliases[k]}'`).join('\n');
+  }
+
+  // Parse alias name='expansion' or name="expansion"
+  const input = args.join(' ');
+  const match = input.match(/^(\w+)=(['"])(.*)\2$/);
+  if (!match) {
+    // Try without quotes: alias name=command
+    const simpleMatch = input.match(/^(\w+)=(.+)$/);
+    if (!simpleMatch) {
+      return `${ANSI.red}usage: alias name='command'${ANSI.reset}`;
+    }
+    const aliases = loadAliases();
+    aliases[simpleMatch[1]] = simpleMatch[2];
+    saveAliases(aliases);
+    return `${ANSI.green}alias ${simpleMatch[1]}='${simpleMatch[2]}'${ANSI.reset}`;
+  }
+
+  const aliases = loadAliases();
+  aliases[match[1]] = match[3];
+  saveAliases(aliases);
+  return `${ANSI.green}alias ${match[1]}='${match[3]}'${ANSI.reset}`;
+}
+
+export function unaliasCommand(args: string[]): string {
+  if (args.length === 0) {
+    return `${ANSI.red}usage: unalias <name>${ANSI.reset}`;
+  }
+  const aliases = loadAliases();
+  const name = args[0];
+  if (!(name in aliases)) {
+    return `${ANSI.red}unalias: ${name}: not found${ANSI.reset}`;
+  }
+  delete aliases[name];
+  saveAliases(aliases);
+  return `${ANSI.green}Removed alias '${name}'${ANSI.reset}`;
+}
+
+// Resolve aliases (single-pass, no recursion to avoid loops)
+const BUILTIN_COMMANDS = new Set([
+  'help', 'clear', 'date', 'echo', 'ls', 'cd', 'pwd', 'cat',
+  'tree', 'grep', 'open', 'whoami', 'skills', 'experience',
+  'contact', 'projects', 'history', 'ping', 'theme',
+  'gs', 'gl', 'git', 'neofetch', 'cowsay', 'sudo', 'vim', 'vi', 'nano',
+  'exit', 'quit', 'logout', 'sl', 'rm',
+  'docker', 'ssh', 'htop', 'top', 'uptime', 'make',
+  'npm', 'npx', 'bun', 'bunx', 'uv',
+  'claude', 'claude-code', 'codex', 'opencode',
+  'man', 'cal', 'ncal', 'scp', 'todo', 'alias', 'unalias',
+  'jobs', 'fg', 'bg',
+]);
+
+export function resolveAlias(command: string, aliases: Record<string, string>): string {
+  const parts = command.split(' ');
+  const cmd = parts[0];
+  // Don't override builtins
+  if (BUILTIN_COMMANDS.has(cmd)) return command;
+  if (cmd in aliases) {
+    return aliases[cmd] + (parts.length > 1 ? ' ' + parts.slice(1).join(' ') : '');
+  }
+  return command;
+}
+
+// Jobs command — display background job table
+export interface Job {
+  id: number;
+  name: string;
+  progress: number;
+  done: boolean;
+  intervalId: number;
+}
+
+export function jobsCommand(jobs: Job[]): string {
+  if (jobs.length === 0) {
+    return `${ANSI.dim}No background jobs.${ANSI.reset}`;
+  }
+  return jobs.map(j => {
+    const status = j.done
+      ? `${ANSI.green}Done${ANSI.reset}`
+      : `${ANSI.yellow}Running${ANSI.reset}`;
+    const pct = j.done ? '' : `  (${Math.round(j.progress)}%)`;
+    const marker = j.id === jobs[jobs.length - 1].id ? '+' : ' ';
+    return `[${j.id}]${marker} ${status.padEnd(20)} ${j.name} &${pct}`;
+  }).join('\n');
+}
+
+export function fgCommand(args: string[], jobs: Job[]): string {
+  if (jobs.length === 0) {
+    return `fg: no current job`;
+  }
+  const targetId = args[0] ? parseInt(args[0]) : jobs[jobs.length - 1].id;
+  const job = jobs.find(j => j.id === targetId);
+  if (!job) {
+    return `fg: %${targetId}: no such job`;
+  }
+  if (job.done) {
+    return `[${job.id}]  Done                    ${job.name}`;
+  }
+  job.progress = 100;
+  job.done = true;
+  if (job.intervalId) clearInterval(job.intervalId);
+  return `${job.name}: completed.`;
+}
+
+export function bgCommand(): string {
+  return `bg: no stopped jobs`;
+}
+
 // Tab completion
 export function getCompletions(input: string): { completions: string[]; prefix: string } {
   const trimmed = input.trim();
@@ -788,6 +1055,8 @@ export function getCompletions(input: string): { completions: string[]; prefix: 
       'contact', 'projects', 'history', 'ping', 'theme',
       'gs', 'gl', 'neofetch', 'cowsay', 'sudo', 'vim', 'exit', 'sl', 'rm',
       'docker', 'ssh', 'htop', 'uptime', 'make',
+      'man', 'cal', 'ncal', 'scp', 'todo', 'alias', 'unalias',
+      'jobs', 'fg', 'bg',
     ];
     const matches = commands.filter(cmd => cmd.startsWith(trimmed));
     return { completions: matches, prefix: '' };
