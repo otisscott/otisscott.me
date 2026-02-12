@@ -5,8 +5,7 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { xtermTheme } from '@/lib/theme/tokyo-night';
-import { themes, themeNames } from '@/lib/theme/themes';
+import { themes, themeNames, ColorMode } from '@/lib/theme/themes';
 import {
   generatePrompt,
   generateShortPrompt,
@@ -58,6 +57,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const lastTabInputRef = useRef('');
   const ghostTextRef = useRef('');
   const currentThemeRef = useRef('tokyo-night');
+  const colorModeRef = useRef<ColorMode>('dark');
   const interactiveModeRef = useRef<((data: string) => void) | null>(null);
 
   const writePrompt = useCallback(() => {
@@ -175,6 +175,16 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     writePrompt,
   }), [writePrompt]);
 
+  const applyTheme = useCallback((themeName: string, mode: ColorMode) => {
+    const theme = themes[themeName];
+    if (!theme || !xtermRef.current) return;
+    const variant = theme[mode];
+    xtermRef.current.options.theme = variant.xterm;
+    document.documentElement.style.setProperty('--bg-primary', variant.css.bgPrimary);
+    document.documentElement.style.setProperty('--bg-secondary', variant.css.bgSecondary);
+    document.documentElement.style.setProperty('--bg-tertiary', variant.css.bgTertiary);
+  }, []);
+
   const handleCommand = useCallback((command: string) => {
     const trimmedCommand = command.trim();
 
@@ -287,7 +297,8 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           const themeName = args[0];
           if (!themeName) {
             const current = currentThemeRef.current;
-            let list = `${ANSI.bold}Available themes:${ANSI.reset}\n\n`;
+            const mode = colorModeRef.current;
+            let list = `${ANSI.bold}Available themes:${ANSI.reset} ${ANSI.dim}(${mode} mode)${ANSI.reset}\n\n`;
             for (const name of themeNames) {
               const marker = name === current ? ` ${ANSI.green}(active)${ANSI.reset}` : '';
               list += `  ${ANSI.cyan}${name}${ANSI.reset}${marker}\n`;
@@ -296,14 +307,9 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
             writeOutput(list);
           } else if (themes[themeName]) {
             const t = themes[themeName];
-            if (xtermRef.current) {
-              xtermRef.current.options.theme = t.xterm;
-            }
-            document.documentElement.style.setProperty('--bg-primary', t.css.bgPrimary);
-            document.documentElement.style.setProperty('--bg-secondary', t.css.bgSecondary);
-            document.documentElement.style.setProperty('--bg-tertiary', t.css.bgTertiary);
             currentThemeRef.current = themeName;
-            writeOutput(`${ANSI.green}Switched to ${t.name}${ANSI.reset}`);
+            applyTheme(themeName, colorModeRef.current);
+            writeOutput(`${ANSI.green}Switched to ${t.name} (${colorModeRef.current})${ANSI.reset}`);
           } else {
             setExitCode(1);
             writeOutput(`${ANSI.red}theme: unknown theme '${themeName}'. Try 'theme' to list.${ANSI.reset}`);
@@ -371,14 +377,25 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
 
     const wrapper = terminalRef.current;
 
+    // Detect system color scheme
+    const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const initialMode: ColorMode = darkQuery.matches ? 'dark' : 'light';
+    colorModeRef.current = initialMode;
+    const initialVariant = themes['tokyo-night'][initialMode];
+
     const term = new XTerm({
-      theme: xtermTheme,
+      theme: initialVariant.xterm,
       fontFamily: '"SF Mono", "Fira Code", "JetBrains Mono", "Consolas", "Monaco", "Courier New", monospace',
       fontSize: 14,
       cursorBlink: true,
       cursorStyle: 'block',
       scrollback: 10000,
     });
+
+    // Set initial CSS vars
+    document.documentElement.style.setProperty('--bg-primary', initialVariant.css.bgPrimary);
+    document.documentElement.style.setProperty('--bg-secondary', initialVariant.css.bgSecondary);
+    document.documentElement.style.setProperty('--bg-tertiary', initialVariant.css.bgTertiary);
 
     const fitAddon = new FitAddon();
     fitAddonRef.current = fitAddon;
@@ -465,6 +482,14 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     };
 
     window.addEventListener('resize', handleWindowResize);
+
+    // Listen for system color scheme changes
+    const handleColorSchemeChange = (e: MediaQueryListEvent) => {
+      const newMode: ColorMode = e.matches ? 'dark' : 'light';
+      colorModeRef.current = newMode;
+      applyTheme(currentThemeRef.current, newMode);
+    };
+    darkQuery.addEventListener('change', handleColorSchemeChange);
 
     term.onData((data) => {
       // Interactive mode intercept (e.g., vim command buffer)
@@ -579,10 +604,11 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
 
     return () => {
       window.removeEventListener('resize', handleWindowResize);
+      darkQuery.removeEventListener('change', handleColorSchemeChange);
       term.dispose();
       xtermRef.current = null;
     };
-  }, [handleCommand, handleTabCompletion, computeGhostText, onData, writePrompt, writeShortPrompt]);
+  }, [handleCommand, handleTabCompletion, computeGhostText, onData, writePrompt, writeShortPrompt, applyTheme]);
 
   return (
     <div
