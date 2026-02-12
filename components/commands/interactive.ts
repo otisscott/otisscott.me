@@ -561,25 +561,35 @@ export function startSsh(ctx: TerminalContext): void {
 
 /**
  * htop — full-screen takeover, press q or F10 to exit (like vim pattern)
+ * Processes reference real projects; CPU/mem values fluctuate each refresh.
  */
 export function startHtop(ctx: TerminalContext, loadTime: number): void {
   const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
   const cols = term.cols;
   const rows = term.rows;
 
+  // Base process definitions — cpu/mem are center points that jitter each tick
   const processes = [
-    { pid: 1, user: 'otis', cpu: '12.3', mem: '4.2', cmd: `${ANSI.green}xterm-renderer${ANSI.reset}` },
-    { pid: 42, user: 'otis', cpu: '8.7', mem: '3.1', cmd: `${ANSI.green}theme-engine${ANSI.reset}` },
-    { pid: 101, user: 'otis', cpu: '5.4', mem: '2.8', cmd: `${ANSI.cyan}next-dev-server${ANSI.reset}` },
-    { pid: 137, user: 'root', cpu: '3.2', mem: '1.5', cmd: `${ANSI.dim}cowsay-daemon${ANSI.reset}` },
-    { pid: 256, user: 'otis', cpu: '2.1', mem: '1.2', cmd: `${ANSI.dim}neofetch-worker${ANSI.reset}` },
-    { pid: 314, user: 'otis', cpu: '1.8', mem: '0.9', cmd: `${ANSI.dim}portfolio-watcher${ANSI.reset}` },
-    { pid: 420, user: 'root', cpu: '0.5', mem: '0.3', cmd: `${ANSI.dim}easter-egg-loader${ANSI.reset}` },
-    { pid: 512, user: 'otis', cpu: '0.2', mem: '0.1', cmd: `${ANSI.dim}git-status-poller${ANSI.reset}` },
+    { pid: 1,   user: 'otis', baseCpu: 14, baseMem: 5.0, cmd: 'vault-os', color: ANSI.green },
+    { pid: 22,  user: 'otis', baseCpu: 9,  baseMem: 3.8, cmd: 'next-dev-server', color: ANSI.green },
+    { pid: 55,  user: 'otis', baseCpu: 7,  baseMem: 3.2, cmd: 'xterm-renderer', color: ANSI.green },
+    { pid: 101, user: 'otis', baseCpu: 5,  baseMem: 2.4, cmd: 'lwin-mapper', color: ANSI.cyan },
+    { pid: 137, user: 'otis', baseCpu: 4,  baseMem: 1.8, cmd: 'dataearn-api', color: ANSI.cyan },
+    { pid: 200, user: 'otis', baseCpu: 3,  baseMem: 1.4, cmd: 'theme-engine', color: ANSI.white },
+    { pid: 256, user: 'otis', baseCpu: 2,  baseMem: 0.9, cmd: 'shopify-bridge', color: ANSI.white },
+    { pid: 314, user: 'root', baseCpu: 1.5, baseMem: 0.6, cmd: 'sec-scraper', color: ANSI.dim },
+    { pid: 420, user: 'root', baseCpu: 0.8, baseMem: 0.3, cmd: 'cowsay-daemon', color: ANSI.dim },
+    { pid: 512, user: 'otis', baseCpu: 0.4, baseMem: 0.2, cmd: 'easter-egg-loader', color: ANSI.dim },
+    { pid: 666, user: 'root', baseCpu: 0.2, baseMem: 0.1, cmd: 'git-status-poller', color: ANSI.dim },
   ];
 
+  const jitter = (base: number, range: number) => {
+    const val = base + (Math.random() * range * 2 - range);
+    return Math.max(0.1, val);
+  };
+
   const drawBar = (pct: number, width: number, color: string): string => {
-    const filled = Math.round((pct / 100) * width);
+    const filled = Math.min(width, Math.round((pct / 100) * width));
     const empty = width - filled;
     return `${color}${'|'.repeat(filled)}${ANSI.reset}${ANSI.dim}${' '.repeat(empty)}${ANSI.reset}`;
   };
@@ -592,13 +602,16 @@ export function startHtop(ctx: TerminalContext, loadTime: number): void {
     const sec = totalSec % 60;
     const uptimeStr = min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `0:${String(sec).padStart(2, '0')}`;
 
+    // Jitter the totals each tick
+    const cpuPct = jitter(42, 8);
+    const memPct = jitter(26, 4);
     const barW = Math.min(30, cols - 20);
 
     term.write('\x1b[2J\x1b[H');
 
-    // Header
-    term.write(`  ${ANSI.bold}CPU${ANSI.reset}[${drawBar(38, barW, ANSI.green)}${ANSI.dim} 38.2%${ANSI.reset}]\r\n`);
-    term.write(`  ${ANSI.bold}Mem${ANSI.reset}[${drawBar(24, barW, ANSI.cyan)}${ANSI.dim} 24.1%${ANSI.reset}]\r\n`);
+    // Header bars
+    term.write(`  ${ANSI.bold}CPU${ANSI.reset}[${drawBar(cpuPct, barW, ANSI.green)}${ANSI.dim} ${cpuPct.toFixed(1)}%${ANSI.reset}]\r\n`);
+    term.write(`  ${ANSI.bold}Mem${ANSI.reset}[${drawBar(memPct, barW, ANSI.cyan)}${ANSI.dim} ${memPct.toFixed(1)}%${ANSI.reset}]\r\n`);
     term.write(`\r\n`);
     term.write(`  ${ANSI.dim}Tasks: ${ANSI.reset}${ANSI.bold}${processes.length}${ANSI.reset}${ANSI.dim}; Uptime: ${uptimeStr}${ANSI.reset}\r\n`);
     term.write(`\r\n`);
@@ -607,11 +620,17 @@ export function startHtop(ctx: TerminalContext, loadTime: number): void {
     const header = `${ANSI.bold}\x1b[7m  PID USER      CPU%  MEM%  COMMAND${' '.repeat(Math.max(0, cols - 36))}\x1b[27m${ANSI.reset}`;
     term.write(header + '\r\n');
 
-    // Processes
-    const maxProcs = Math.min(processes.length, rows - 9);
+    // Processes with jittered values, sorted by CPU desc
+    const live = processes.map(p => ({
+      ...p,
+      cpu: jitter(p.baseCpu, p.baseCpu * 0.3),
+      mem: jitter(p.baseMem, p.baseMem * 0.2),
+    })).sort((a, b) => b.cpu - a.cpu);
+
+    const maxProcs = Math.min(live.length, rows - 9);
     for (let i = 0; i < maxProcs; i++) {
-      const p = processes[i];
-      const line = `  ${String(p.pid).padStart(3)} ${p.user.padEnd(9)} ${p.cpu.padStart(5)} ${p.mem.padStart(5)}  ${p.cmd}`;
+      const p = live[i];
+      const line = `  ${String(p.pid).padStart(3)} ${p.user.padEnd(9)} ${p.cpu.toFixed(1).padStart(5)} ${p.mem.toFixed(1).padStart(5)}  ${p.color}${p.cmd}${ANSI.reset}`;
       term.write(line + '\r\n');
     }
 
@@ -627,30 +646,29 @@ export function startHtop(ctx: TerminalContext, loadTime: number): void {
 
   drawScreen();
 
-  // Refresh every 2 seconds to update uptime
-  const refreshInterval = setInterval(drawScreen, 2000);
+  // Refresh every 750ms — frequent enough to feel alive, light enough to stay smooth
+  const refreshInterval = setInterval(drawScreen, 750);
+
+  const exitHtop = () => {
+    clearInterval(refreshInterval);
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H');
+    term.writeln(`${ANSI.dim}(Exited htop)${ANSI.reset}`);
+    resetInput();
+    writePrompt();
+  };
 
   setInteractiveMode((data: string) => {
     const code = data.charCodeAt(0);
 
     if (data === 'q' || data === 'Q' || code === 3) {
-      clearInterval(refreshInterval);
-      setInteractiveMode(null);
-      term.write('\x1b[2J\x1b[H');
-      term.writeln(`${ANSI.dim}(Exited htop)${ANSI.reset}`);
-      resetInput();
-      writePrompt();
+      exitHtop();
       return;
     }
 
     // F10 key (ESC [ 21 ~)
     if (data === '\x1b[21~') {
-      clearInterval(refreshInterval);
-      setInteractiveMode(null);
-      term.write('\x1b[2J\x1b[H');
-      term.writeln(`${ANSI.dim}(Exited htop)${ANSI.reset}`);
-      resetInput();
-      writePrompt();
+      exitHtop();
     }
   });
 }
