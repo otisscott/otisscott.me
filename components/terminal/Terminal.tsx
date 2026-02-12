@@ -21,6 +21,7 @@ import {
   projectsCommand,
   gsCommand,
   glCommand,
+  gitCommand,
   neofetchCommand,
   cowsayCommand,
   echoCommand,
@@ -244,6 +245,9 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           break;
         case 'projects':
           writeOutput(projectsCommand());
+          break;
+        case 'git':
+          writeOutput(gitCommand(args));
           break;
         case 'gs':
           writeOutput(gsCommand());
