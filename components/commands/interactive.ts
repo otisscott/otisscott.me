@@ -524,6 +524,72 @@ export function startOpencode(ctx: TerminalContext): void {
   });
 }
 
+/**
+ * SCP file transfer animation — fire-and-forget (like ssh/make pattern)
+ */
+export function startScp(ctx: TerminalContext): void {
+  const { term, resetInput, writePrompt } = ctx;
+
+  term.write(`\r\nConnecting to otisscott.me...`);
+
+  let progress = 0;
+  const totalKB = 372;
+  const barWidth = 16;
+
+  const drawProgress = () => {
+    const pct = Math.min(progress, 100);
+    const filled = Math.round((pct / 100) * barWidth);
+    const empty = barWidth - filled;
+    const bar = '█'.repeat(filled) + '░'.repeat(empty);
+    const kb = Math.round((pct / 100) * totalKB);
+    const speed = (1.8 + Math.random() * 0.8).toFixed(1);
+    term.write(`\r${ANSI.reset}resume.pdf ${String(pct).padStart(3)}% |${ANSI.green}${bar}${ANSI.reset}| ${String(kb).padStart(3)}KB ${speed}MB/s`);
+  };
+
+  setTimeout(() => {
+    const interval = setInterval(() => {
+      progress += Math.floor(Math.random() * 12) + 5;
+      if (progress >= 100) {
+        progress = 100;
+        drawProgress();
+        clearInterval(interval);
+        term.write(`\r\n\r\n${ANSI.green}File received.${ANSI.reset}`);
+        term.write(`\r\n${ANSI.dim}(Resume download not wired up yet — drop a PDF in public/ to enable)${ANSI.reset}`);
+        resetInput();
+        writePrompt();
+      } else {
+        drawProgress();
+      }
+    }, 200);
+  }, 600);
+}
+
+/**
+ * Start a background job — returns interval ID so Terminal can track it
+ */
+export function startBgJob(
+  name: string,
+  onProgress: (progress: number) => void,
+  onDone: () => void,
+): number {
+  let progress = 0;
+  const duration = 10000 + Math.random() * 10000; // 10-20s
+  const tickMs = 500;
+  const increment = (tickMs / duration) * 100;
+
+  const intervalId = window.setInterval(() => {
+    progress += increment + (Math.random() * increment * 0.5);
+    if (progress >= 100) {
+      progress = 100;
+      clearInterval(intervalId);
+      onDone();
+    }
+    onProgress(Math.min(progress, 100));
+  }, tickMs);
+
+  return intervalId;
+}
+
 // ─── Dev Tool Easter Eggs ────────────────────────────────────────────
 
 /**

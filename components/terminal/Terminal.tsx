@@ -36,10 +36,21 @@ import {
   packageManagerCommand,
   uptimeCommand,
   dockerCommand,
+  manCommand,
+  calCommand,
+  todoCommand,
+  aliasCommand,
+  unaliasCommand,
+  loadAliases,
+  resolveAlias,
+  jobsCommand,
+  fgCommand,
+  bgCommand,
   getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
-import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode, startSsh, startHtop, startMake } from '@/components/commands/interactive';
+import type { Job } from '@/components/commands/handlers';
+import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode, startSsh, startHtop, startMake, startScp, startBgJob } from '@/components/commands/interactive';
 import { ANSI, padEndVisible } from '@/lib/filesystem/types';
 
 interface TerminalProps {
@@ -63,6 +74,9 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const colorModeRef = useRef<ColorMode>('dark');
   const interactiveModeRef = useRef<((data: string) => void) | null>(null);
   const loadTimeRef = useRef(Date.now());
+  const aliasesRef = useRef<Record<string, string>>({});
+  const jobsRef = useRef<Job[]>([]);
+  const nextJobIdRef = useRef(1);
 
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
@@ -200,7 +214,56 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         onCommand(trimmedCommand);
       }
 
-      const parts = trimmedCommand.split(' ');
+      // Resolve aliases (single-pass)
+      const resolved = resolveAlias(trimmedCommand, aliasesRef.current);
+
+      // Pipe detection: history | grep <pattern>
+      if (resolved.includes(' | ')) {
+        const [left, ...rightParts] = resolved.split(' | ');
+        const right = rightParts.join(' | ').trim();
+        if (left.trim() === 'history' && right.startsWith('grep')) {
+          const pattern = right.replace(/^grep\s*/, '').trim();
+          if (!pattern) {
+            writeOutput(`${ANSI.red}usage: history | grep <pattern>${ANSI.reset}`);
+          } else {
+            const histOutput = historyCommand(commandHistoryRef.current);
+            const filtered = histOutput.split('\n').filter(line =>
+              line.toLowerCase().includes(pattern.toLowerCase())
+            );
+            writeOutput(filtered.length > 0 ? filtered.join('\n') : `${ANSI.dim}No matches for "${pattern}"${ANSI.reset}`);
+          }
+          setExitCode(0);
+          inputBufferRef.current = '';
+          cursorPositionRef.current = 0;
+          tabPressCountRef.current = 0;
+          writePrompt();
+          return;
+        }
+      }
+
+      // Trailing & detection: background job
+      if (resolved.endsWith(' &') || (resolved.endsWith('&') && resolved.length > 1)) {
+        const bgCmd = resolved.replace(/\s*&$/, '').trim();
+        if (bgCmd && jobsRef.current.length < 5) {
+          const jobId = nextJobIdRef.current++;
+          const job: Job = { id: jobId, name: bgCmd, progress: 0, done: false, intervalId: 0 };
+          jobsRef.current.push(job);
+          const pid = 1000 + Math.floor(Math.random() * 9000);
+          job.intervalId = startBgJob(
+            bgCmd,
+            (progress) => { job.progress = progress; },
+            () => { job.done = true; },
+          );
+          writeOutput(`[${jobId}] ${pid} Running   ${bgCmd} &`);
+          inputBufferRef.current = '';
+          cursorPositionRef.current = 0;
+          tabPressCountRef.current = 0;
+          writePrompt();
+          return;
+        }
+      }
+
+      const parts = resolved.split(' ');
       const cmd = parts[0];
       const args = parts.slice(1);
 
@@ -225,12 +288,13 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         case 'ls':
           writeOutput(lsCommand(args));
           break;
-        case 'cd':
+        case 'cd': {
           const cdResult = cdCommand(args);
           if (cdResult) {
             writeOutput(cdResult);
           }
           break;
+        }
         case 'cat':
           writeOutput(catCommand(args));
           break;
@@ -290,7 +354,17 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           writeOutput(grepCommand(args));
           break;
         case 'history':
-          writeOutput(historyCommand(commandHistoryRef.current));
+          // Support: history grep <pattern> as shortcut
+          if (args[0] === 'grep' && args.length > 1) {
+            const pattern = args.slice(1).join(' ');
+            const histOutput = historyCommand(commandHistoryRef.current);
+            const filtered = histOutput.split('\n').filter(line =>
+              line.toLowerCase().includes(pattern.toLowerCase())
+            );
+            writeOutput(filtered.length > 0 ? filtered.join('\n') : `${ANSI.dim}No matches for "${pattern}"${ANSI.reset}`);
+          } else {
+            writeOutput(historyCommand(commandHistoryRef.current));
+          }
           break;
         case 'open': {
           const result = openCommand(args);
@@ -392,6 +466,45 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         case 'uv':
           writeOutput(packageManagerCommand(cmd));
           break;
+        case 'man':
+          writeOutput(manCommand(args));
+          break;
+        case 'cal':
+        case 'ncal':
+          writeOutput(calCommand());
+          break;
+        case 'scp':
+          if (xtermRef.current) {
+            if (args.length === 0) {
+              writeOutput(`${ANSI.red}usage: scp [user@]host:file dest${ANSI.reset}`);
+            } else {
+              startScp(getTerminalContext());
+              return;
+            }
+          }
+          break;
+        case 'todo':
+          writeOutput(todoCommand(args));
+          break;
+        case 'alias':
+          writeOutput(aliasCommand(args));
+          // Refresh cached aliases
+          aliasesRef.current = loadAliases();
+          break;
+        case 'unalias':
+          writeOutput(unaliasCommand(args));
+          aliasesRef.current = loadAliases();
+          break;
+        case 'jobs':
+          // Clean up completed jobs older than the list view
+          writeOutput(jobsCommand(jobsRef.current));
+          break;
+        case 'fg':
+          writeOutput(fgCommand(args, jobsRef.current));
+          break;
+        case 'bg':
+          writeOutput(bgCommand());
+          break;
         default:
           setExitCode(1);
           writeOutput(`${ANSI.red}zsh: command not found: ${cmd}${ANSI.reset}`);
@@ -402,7 +515,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     cursorPositionRef.current = 0;
     tabPressCountRef.current = 0;
     writePrompt();
-  }, [onCommand, writePrompt, writeOutput, getTerminalContext]);
+  }, [onCommand, writePrompt, writeOutput, getTerminalContext, applyTheme]);
 
   useLayoutEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
@@ -442,6 +555,9 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
 
     // Open terminal
     term.open(wrapper);
+
+    // Load aliases from localStorage
+    aliasesRef.current = loadAliases();
 
     // Write welcome message (adapts to terminal width)
     const writeWelcome = () => {
