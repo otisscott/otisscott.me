@@ -36,6 +36,7 @@ import {
   getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
+import { startVim, startSl, startRmRf } from '@/components/commands/interactive';
 import { ANSI, padEndVisible } from '@/lib/filesystem/types';
 
 interface TerminalProps {
@@ -56,7 +57,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const lastTabInputRef = useRef('');
   const ghostTextRef = useRef('');
   const currentThemeRef = useRef('tokyo-night');
-  const interactiveModeRef = useRef<(() => void) | null>(null);
+  const interactiveModeRef = useRef<((data: string) => void) | null>(null);
 
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
@@ -160,6 +161,19 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     return '';
   }, []);
 
+  const getTerminalContext = useCallback(() => ({
+    term: xtermRef.current!,
+    setInteractiveMode: (handler: ((data: string) => void) | null) => {
+      interactiveModeRef.current = handler;
+    },
+    resetInput: () => {
+      inputBufferRef.current = '';
+      cursorPositionRef.current = 0;
+      tabPressCountRef.current = 0;
+    },
+    writePrompt,
+  }), [writePrompt]);
+
   const handleCommand = useCallback((command: string) => {
     const trimmedCommand = command.trim();
 
@@ -237,50 +251,12 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           break;
         case 'vim':
         case 'vi':
-        case 'nano': {
-          const term = xtermRef.current;
-          if (term) {
-            // Clear screen and draw vim UI
-            term.write('\x1b[2J\x1b[H'); // clear + cursor home
-            const rows = term.rows;
-            const cols = term.cols;
-            for (let r = 0; r < rows - 1; r++) {
-              if (r === Math.floor(rows / 2) - 2) {
-                const line = 'VIM - Vi IMproved';
-                const pad = Math.max(0, Math.floor((cols - line.length) / 2));
-                term.write(`${ANSI.bold}${ANSI.white}~${' '.repeat(pad - 1)}${line}${ANSI.reset}\r\n`);
-              } else if (r === Math.floor(rows / 2)) {
-                const line = 'type :q! to exit (just kidding)';
-                const pad = Math.max(0, Math.floor((cols - line.length) / 2));
-                term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}${' '.repeat(pad - 1)}${line}\r\n`);
-              } else if (r === Math.floor(rows / 2) + 2) {
-                const line = "You've been trapped. There is no escape.";
-                const pad = Math.max(0, Math.floor((cols - line.length) / 2));
-                term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}${' '.repeat(pad - 1)}${ANSI.green}${line}${ANSI.reset}\r\n`);
-              } else if (r === Math.floor(rows / 2) + 3) {
-                const line = 'Press any key to continue...';
-                const pad = Math.max(0, Math.floor((cols - line.length) / 2));
-                term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}${' '.repeat(pad - 1)}${ANSI.dim}${line}${ANSI.reset}\r\n`);
-              } else {
-                term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}\r\n`);
-              }
-            }
-            // Status bar at bottom
-            term.write(`${ANSI.bold}${ANSI.white}\x1b[7m -- INSERT --${' '.repeat(Math.max(0, cols - 13))}\x1b[27m${ANSI.reset}`);
-
-            // Set interactive mode — any keypress restores terminal
-            interactiveModeRef.current = () => {
-              term.write('\x1b[2J\x1b[H'); // clear screen
-              term.writeln(`${ANSI.dim}(Escaped from vim. You're one of the lucky ones.)${ANSI.reset}`);
-              inputBufferRef.current = '';
-              cursorPositionRef.current = 0;
-              tabPressCountRef.current = 0;
-              writePrompt();
-            };
-            return; // Skip normal prompt
+        case 'nano':
+          if (xtermRef.current) {
+            startVim(getTerminalContext());
+            return;
           }
           break;
-        }
         case 'exit':
         case 'quit':
         case 'logout':
@@ -336,89 +312,21 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         case 'rm': {
           const fullArgs = args.join(' ');
           if (fullArgs.includes('-rf') && (fullArgs.includes('/') || fullArgs.includes('~'))) {
-            // Animated fake deletion
-            const term = xtermRef.current;
-            if (term) {
-              const files = [
-                'about/whoami.txt', 'about/bio.md', 'work/skills.json',
-                'work/experience/director-of-tech.md', 'contact/email.txt',
-                'projects/vault-os.md', 'projects/dataearn.md',
-                'education/nyu.md', 'misc/now.txt', '/',
-              ];
-              let i = 0;
-              const interval = setInterval(() => {
-                if (i < files.length) {
-                  term.write(`\r\n${ANSI.red}rm: removing ${files[i]}${ANSI.reset}`);
-                  i++;
-                } else {
-                  clearInterval(interval);
-                  term.write(`\r\n\r\n${ANSI.green}Just kidding. Nice try though.${ANSI.reset}`);
-                  inputBufferRef.current = '';
-                  cursorPositionRef.current = 0;
-                  tabPressCountRef.current = 0;
-                  writePrompt();
-                }
-              }, 150);
-              return; // Skip the writePrompt below
+            if (xtermRef.current) {
+              startRmRf(getTerminalContext());
+              return;
             }
           } else {
             writeOutput(`${ANSI.red}rm: permission denied${ANSI.reset}`);
           }
           break;
         }
-        case 'sl': {
-          // Steam locomotive animation
-          const term = xtermRef.current;
-          if (term) {
-            const train = [
-              '      ====        ________                ___________',
-              '  _D _|  |_______/        \\__I_I_____===__|_________|',
-              '   |(_)---  |   H\\________/ |   |        =|___ ___|',
-              '   /     |  |   H  |  |     |   |         ||_| |_||',
-              '  |      |  |   H  |__--------------------| [___] |',
-              '  (      |  |   H  //[]---~\\\\_________|     |     |',
-              '  /\\\\______|__|___H_//  |    |    \\\\_______|     |',
-              ' /                 |      |    |    \\               |',
-              '~~~~~~~~~~~~~~~~~~~~~IIIIIIII~~~~~~~~~~~~~IIIIIIII~~~~',
-            ];
-            const trainWidth = Math.max(...train.map(l => l.length));
-            const cols = term.cols;
-            let pos = cols;
-            let firstFrame = true;
-
-            const interval = setInterval(() => {
-              if (!firstFrame) {
-                term.write(`\x1b[${train.length}A`);
-              }
-              firstFrame = false;
-
-              for (const line of train) {
-                let visible = '';
-                for (let col = 0; col < cols; col++) {
-                  const trainCol = col - pos;
-                  if (trainCol >= 0 && trainCol < line.length) {
-                    visible += line[trainCol];
-                  } else {
-                    visible += ' ';
-                  }
-                }
-                term.write(`\r${ANSI.green}${visible}${ANSI.reset}\r\n`);
-              }
-
-              pos -= 3;
-
-              if (pos < -trainWidth) {
-                clearInterval(interval);
-                inputBufferRef.current = '';
-                cursorPositionRef.current = 0;
-                tabPressCountRef.current = 0;
-                writePrompt();
-              }
-            }, 60);
-            return; // Skip the writePrompt below
+        case 'sl':
+          if (xtermRef.current) {
+            startSl(getTerminalContext());
+            return;
           }
           break;
-        }
         default:
           setExitCode(1);
           writeOutput(`${ANSI.red}zsh: command not found: ${cmd}${ANSI.reset}`);
@@ -429,7 +337,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     cursorPositionRef.current = 0;
     tabPressCountRef.current = 0;
     writePrompt();
-  }, [onCommand, writePrompt, writeOutput]);
+  }, [onCommand, writePrompt, writeOutput, getTerminalContext]);
 
   useLayoutEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
@@ -532,11 +440,9 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     window.addEventListener('resize', handleWindowResize);
 
     term.onData((data) => {
-      // Interactive mode intercept (e.g., vim "press any key")
+      // Interactive mode intercept (e.g., vim command buffer)
       if (interactiveModeRef.current) {
-        const exit = interactiveModeRef.current;
-        interactiveModeRef.current = null;
-        exit();
+        interactiveModeRef.current(data);
         return;
       }
 
