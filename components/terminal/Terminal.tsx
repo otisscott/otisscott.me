@@ -262,23 +262,33 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     // Open terminal
     term.open(wrapper);
 
-    // Write welcome message
+    // Write welcome message (adapts to terminal width)
     const writeWelcome = () => {
-      const W = 56; // inner width between | borders
-      const brow = (content: string) =>
-        `${ANSI.cyan}  |${ANSI.reset}${padEndVisible(content, W)}${ANSI.cyan}|${ANSI.reset}`;
-
-      term.writeln('');
-      term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
-      term.writeln(brow(''));
-      term.writeln(brow(`   Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset} - Terminal Portfolio`));
-      term.writeln(brow(''));
-      term.writeln(brow(`   Type ${ANSI.green}help${ANSI.reset} to see available commands`));
-      term.writeln(brow(`   Try ${ANSI.green}neofetch${ANSI.reset} or ${ANSI.green}cowsay${ANSI.reset} for some fun!`));
-      term.writeln(brow(''));
-      term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
+      const cols = term.cols;
       term.writeln('');
 
+      if (cols >= 50) {
+        // Boxed welcome for wide screens
+        const W = Math.min(56, cols - 4);
+        const brow = (content: string) =>
+          `${ANSI.cyan}  |${ANSI.reset}${padEndVisible(content, W)}${ANSI.cyan}|${ANSI.reset}`;
+
+        term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
+        term.writeln(brow(''));
+        term.writeln(brow(`   Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset}`));
+        term.writeln(brow(''));
+        term.writeln(brow(`   Type ${ANSI.green}help${ANSI.reset} for commands`));
+        term.writeln(brow(`   Try ${ANSI.green}neofetch${ANSI.reset} or ${ANSI.green}cowsay${ANSI.reset}`));
+        term.writeln(brow(''));
+        term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
+      } else {
+        // Borderless welcome for narrow screens
+        term.writeln(` Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset}`);
+        term.writeln('');
+        term.writeln(` Type ${ANSI.green}help${ANSI.reset} for commands`);
+      }
+
+      term.writeln('');
       writeShortPrompt();
     };
 
@@ -291,10 +301,10 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
 
     // Initialize terminal after fonts load
     const initTerminal = () => {
-      // First write welcome (this creates the content)
-      writeWelcome();
-      // Then fit to container
+      // Fit first so term.cols reflects actual screen width
       fitTerminal();
+      // Then write welcome (adapts to cols)
+      writeWelcome();
       // Scroll viewport to show the prompt at the bottom
       setTimeout(() => {
         const viewport = wrapper.querySelector('.xterm-viewport') as HTMLElement;
