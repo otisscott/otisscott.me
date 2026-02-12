@@ -336,10 +336,10 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           writeOutput(claudeCommand(xtermRef.current?.cols || 80));
           break;
         case 'codex':
-          writeOutput(codexCommand());
+          writeOutput(codexCommand(xtermRef.current?.cols || 80));
           break;
         case 'opencode':
-          writeOutput(opencodeCommand());
+          writeOutput(opencodeCommand(xtermRef.current?.cols || 80));
           break;
         case 'npm':
         case 'npx':

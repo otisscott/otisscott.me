@@ -558,30 +558,87 @@ export function claudeCommand(cols: number): string {
   ].join('\n');
 }
 
-export function codexCommand(): string {
-  return `
-${ANSI.green}  ╔══════════════════════════════════════╗
-  ║${ANSI.reset}${ANSI.bold}${ANSI.white}  OpenAI Codex CLI                    ${ANSI.reset}${ANSI.green}║
-  ╚══════════════════════════════════════╝${ANSI.reset}
+export function codexCommand(cols: number): string {
+  const d = ANSI.dim;
+  const r = ANSI.reset;
+  const W = Math.max(40, Math.min(58, cols - 4));
 
-  ${ANSI.dim}Model:${ANSI.reset} o4-mini
-  ${ANSI.dim}Working directory:${ANSI.reset} ~/Projects/otisscott.me
-  ${ANSI.dim}Approval:${ANSI.reset} suggest
+  const row = (content: string) =>
+    `${d}│${r} ${padEndVisible(content, W)}${d} │${r}`;
 
-${ANSI.dim}  (This is a website, not a real terminal.)${ANSI.reset}`;
+  const titleText = '── ';
+  const topFill = Math.max(0, W + 2 - titleText.length);
+
+  return [
+    '',
+    `${d}╭${titleText}${'─'.repeat(topFill)}╮${r}`,
+    row(`${d}>_${r} ${ANSI.bold}OpenAI Codex${r} ${d}(v0.1.2503262313)${r}`),
+    row(''),
+    row(`${d}model:     ${r}o4-mini   ${d}/model${ANSI.cyan} to change${r}`),
+    row(`${d}directory: ${r}~/Projects/otisscott.me`),
+    `${d}╰${'─'.repeat(W + 2)}╯${r}`,
+  ].join('\n');
 }
 
-export function opencodeCommand(): string {
-  return `
-${ANSI.cyan}┌─────────────────────────────────────────┐
-│${ANSI.reset}${ANSI.bold}  opencode ${ANSI.reset}${ANSI.dim}v0.1${ANSI.reset}                           ${ANSI.cyan}│
-│${ANSI.reset}                                         ${ANSI.cyan}│
-│${ANSI.reset}  ${ANSI.dim}Provider:${ANSI.reset} anthropic                     ${ANSI.cyan}│
-│${ANSI.reset}  ${ANSI.dim}Model:${ANSI.reset}    claude-sonnet-4-5              ${ANSI.cyan}│
-│${ANSI.reset}  ${ANSI.dim}cwd:${ANSI.reset}      ~/Projects/otisscott.me       ${ANSI.cyan}│
-└─────────────────────────────────────────┘${ANSI.reset}
+export function opencodeCommand(cols: number): string {
+  const d = ANSI.dim;
+  const r = ANSI.reset;
+  const gray = '\x1b[90m';
+  const shadow1 = '\x1b[38;5;235m';
+  const bg1 = '\x1b[48;5;235m';
+  const shadow2 = '\x1b[38;5;238m';
+  const bg2 = '\x1b[48;5;238m';
 
-${ANSI.dim}  (This is a website, not a real terminal.)${ANSI.reset}`;
+  // Render the "open code" logo with shadow effects
+  // _ = shadow bg space, ^ = fg char + shadow bg ▀, ~ = shadow fg ▀
+  const logoLeft = [
+    '                   ',
+    '█▀▀█ █▀▀█ █▀▀█ █▀▀▄',
+    '█__█ █__█ █^^^ █__█',
+    '▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀',
+  ];
+  const logoRight = [
+    '             ▄     ',
+    '█▀▀▀ █▀▀█ █▀▀█ █▀▀█',
+    '█___ █__█ █__█ █^^^',
+    '▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀',
+  ];
+
+  const drawLine = (line: string, fg: string, shadow: string, bg: string) => {
+    let out = '';
+    for (const ch of line) {
+      if (ch === '_') { out += `${bg} ${r}`; continue; }
+      if (ch === '^') { out += `${fg}${bg}▀${r}`; continue; }
+      if (ch === '~') { out += `${shadow}▀${r}`; continue; }
+      if (ch === ' ') { out += ' '; continue; }
+      out += `${fg}${ch}${r}`;
+    }
+    return out;
+  };
+
+  const logoLines: string[] = [];
+  for (let i = 0; i < logoLeft.length; i++) {
+    const left = drawLine(logoLeft[i], gray, shadow1, bg1);
+    const right = drawLine(logoRight[i], r, shadow2, bg2);
+    logoLines.push(left + ' ' + right);
+  }
+
+  // Center the logo
+  const logoVisibleWidth = 41; // "open" (20) + gap (1) + "code" (20)
+  const pad = Math.max(0, Math.floor((cols - logoVisibleWidth) / 2));
+  const padStr = ' '.repeat(pad);
+
+  // Status bar
+  const dir = '~/Projects/otisscott.me';
+  const ver = 'v0.2.22';
+  const statusGap = Math.max(1, cols - dir.length - ver.length - 4);
+
+  return [
+    '',
+    ...logoLines.map(l => padStr + l),
+    '',
+    `${d}  ${dir}${' '.repeat(statusGap)}${ver}${r}`,
+  ].join('\n');
 }
 
 // Package manager easter eggs
