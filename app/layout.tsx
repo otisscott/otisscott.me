@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "otisscott.me - Terminal Portfolio",
-  description: "A terminal-emulated personal website built with Next.js and xterm.js",
+  title: "Otis Scott",
+  description: "Otis Scott — Director of Technology, Manhattan Wine Company",
 };
 
 export default function RootLayout({
