@@ -364,7 +364,7 @@ export function startCodex(ctx: TerminalContext): void {
         `${d}╭── ${'─'.repeat(topFill - 1)}╮${r}`,
         row(`${d}>_${r} ${ANSI.bold}OpenAI Codex${r} ${d}(v0.1.2503262313)${r}`),
         row(''),
-        row(`${d}model:     ${r}o4-mini   ${d}/model${ANSI.cyan} to change${r}`),
+        row(`${d}model:     ${r}gpt-5.3-codex-high   ${d}/model${ANSI.cyan} to change${r}`),
         row(`${d}directory: ${r}~/Projects/otisscott.me`),
         `${d}╰${'─'.repeat(W + 2)}╯${r}`,
       ];
@@ -373,66 +373,153 @@ export function startCodex(ctx: TerminalContext): void {
 }
 
 /**
- * OpenCode interactive session
+ * OpenCode interactive session — matches the real TUI layout
  */
 export function startOpencode(ctx: TerminalContext): void {
-  const cols = ctx.term.cols;
-  startAiSession(ctx, {
-    name: 'opencode',
-    exitHint: '/exit or Ctrl+C',
-    promptChar: '>',
-    promptColor: ANSI.cyan,
-    renderHeader: (c) => {
-      const r = ANSI.reset;
-      const d = ANSI.dim;
-      const gray = '\x1b[90m';
-      const shadow1 = '\x1b[38;5;235m';
-      const bg1 = '\x1b[48;5;235m';
-      const shadow2 = '\x1b[38;5;238m';
-      const bg2 = '\x1b[48;5;238m';
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+  const cols = term.cols;
+  const rows = term.rows;
+  const r = ANSI.reset;
+  const d = ANSI.dim;
+  const gray = '\x1b[90m';
+  const shadow1 = '\x1b[38;5;235m';
+  const bg1 = '\x1b[48;5;235m';
+  const shadow2 = '\x1b[38;5;238m';
+  const bg2 = '\x1b[48;5;238m';
+  const inputBg = '\x1b[48;5;237m';
 
-      const logoLeft = [
-        '                   ',
-        '█▀▀█ █▀▀█ █▀▀█ █▀▀▄',
-        '█__█ █__█ █^^^ █__█',
-        '▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀',
-      ];
-      const logoRight = [
-        '             ▄     ',
-        '█▀▀▀ █▀▀█ █▀▀█ █▀▀█',
-        '█___ █__█ █__█ █^^^',
-        '▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀',
-      ];
+  const logoLeft = [
+    '                   ',
+    '█▀▀█ █▀▀█ █▀▀█ █▀▀▄',
+    '█__█ █__█ █^^^ █__█',
+    '▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀',
+  ];
+  const logoRight = [
+    '             ▄     ',
+    '█▀▀▀ █▀▀█ █▀▀█ █▀▀█',
+    '█___ █__█ █__█ █^^^',
+    '▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀',
+  ];
 
-      const drawLine = (line: string, fg: string, shadow: string, bg: string) => {
-        let out = '';
-        for (const ch of line) {
-          if (ch === '_') { out += `${bg} ${r}`; continue; }
-          if (ch === '^') { out += `${fg}${bg}▀${r}`; continue; }
-          if (ch === '~') { out += `${shadow}▀${r}`; continue; }
-          if (ch === ' ') { out += ' '; continue; }
-          out += `${fg}${ch}${r}`;
-        }
-        return out;
-      };
+  const drawLogoLine = (line: string, fg: string, shadow: string, bg: string) => {
+    let out = '';
+    for (const ch of line) {
+      if (ch === '_') { out += `${bg} ${r}`; continue; }
+      if (ch === '^') { out += `${fg}${bg}▀${r}`; continue; }
+      if (ch === '~') { out += `${shadow}▀${r}`; continue; }
+      if (ch === ' ') { out += ' '; continue; }
+      out += `${fg}${ch}${r}`;
+    }
+    return out;
+  };
 
-      const logoLines: string[] = [];
-      for (let i = 0; i < logoLeft.length; i++) {
-        const left = drawLine(logoLeft[i], gray, shadow1, bg1);
-        const right = drawLine(logoRight[i], r, shadow2, bg2);
-        const pad = ' '.repeat(Math.max(0, Math.floor((c - 41) / 2)));
-        logoLines.push(pad + left + ' ' + right);
+  const logoLines: string[] = [];
+  for (let i = 0; i < logoLeft.length; i++) {
+    const left = drawLogoLine(logoLeft[i], gray, shadow1, bg1);
+    const right = drawLogoLine(logoRight[i], r, shadow2, bg2);
+    const pad = ' '.repeat(Math.max(0, Math.floor((cols - 41) / 2)));
+    logoLines.push(pad + left + ' ' + right);
+  }
+
+  let inputBuf = '';
+  let responseIdx = 0;
+  const inputW = Math.min(75, cols - 8);
+  const inputPad = Math.max(0, Math.floor((cols - inputW - 3) / 2));
+
+  const drawScreen = (extraLines?: string[]) => {
+    term.write('\x1b[2J\x1b[H');
+
+    // Top spacer
+    const topPad = Math.max(1, Math.floor((rows - 14) / 2));
+    for (let i = 0; i < topPad; i++) term.write('\r\n');
+
+    // Logo
+    for (const line of logoLines) {
+      term.write(line + '\r\n');
+    }
+    term.write('\r\n');
+
+    // Input box with cyan left border
+    const placeholder = inputBuf
+      ? inputBuf + ' '.repeat(Math.max(0, inputW - inputBuf.length))
+      : `${d}Ask anything... "What is the tech stack of this project?"${r}` ;
+    const inputLine = inputBuf
+      ? `${inputBg} ${inputBuf}${' '.repeat(Math.max(0, inputW - inputBuf.length))} ${r}`
+      : `${inputBg} ${d}Ask anything... "What is the tech stack of this project?"${r}${inputBg}${' '.repeat(Math.max(0, inputW - 57))} ${r}`;
+    term.write(`${' '.repeat(inputPad)}${ANSI.cyan}│${r}${inputLine}\r\n`);
+
+    // Model info line
+    const modelLine = `${inputBg} ${ANSI.cyan}Sisyphus${r}${inputBg}  ${ANSI.white}Kimi K2.5${r}${inputBg}  ${d}Moonshot${r}${inputBg}${' '.repeat(Math.max(0, inputW - 30))} ${r}`;
+    term.write(`${' '.repeat(inputPad)}${ANSI.cyan}│${r}${modelLine}\r\n`);
+
+    term.write('\r\n');
+
+    // Keyboard shortcuts
+    const shortcuts = `${ANSI.bold}ctrl+t${r} ${d}variants${r}  ${ANSI.bold}tab${r} ${d}agents${r}  ${ANSI.bold}ctrl+p${r} ${d}commands${r}`;
+    const shortcutPad = ' '.repeat(Math.max(0, Math.floor((cols - 42) / 2)));
+    term.write(`${shortcutPad}${shortcuts}\r\n`);
+
+    if (extraLines) {
+      term.write('\r\n');
+      for (const line of extraLines) {
+        term.write(`${' '.repeat(inputPad)}  ${line}\r\n`);
       }
+    }
 
-      const dir = '~/Projects/otisscott.me';
-      const ver = 'v0.2.22';
-      const statusGap = Math.max(1, c - dir.length - ver.length - 4);
+    // Position cursor in input box
+    term.write(`\x1b[${topPad + logoLines.length + 2};${inputPad + 3 + inputBuf.length}H`);
+  };
 
-      return [
-        ...logoLines,
-        '',
-        `${d}  ${dir}${' '.repeat(statusGap)}${ver}${r}`,
-      ];
-    },
+  const exitSession = () => {
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H');
+    term.writeln(`${d}(Exited opencode)${r}`);
+    resetInput();
+    writePrompt();
+  };
+
+  drawScreen();
+
+  setInteractiveMode((data: string) => {
+    const code = data.charCodeAt(0);
+
+    if (code === 3) {
+      exitSession();
+      return;
+    }
+
+    if (code === 13) {
+      const cmd = inputBuf.trim();
+      if (cmd === '/exit' || cmd === 'exit' || cmd === 'quit' || cmd === '/quit') {
+        exitSession();
+        return;
+      }
+      if (cmd) {
+        const response = aiResponses[responseIdx % aiResponses.length];
+        responseIdx++;
+        inputBuf = '';
+        drawScreen([
+          `${d}> ${cmd}${r}`,
+          '',
+          `${ANSI.white}${response}${r}`,
+        ]);
+      } else {
+        drawScreen();
+      }
+      return;
+    }
+
+    if (code === 127) {
+      if (inputBuf.length > 0) {
+        inputBuf = inputBuf.slice(0, -1);
+        drawScreen();
+      }
+      return;
+    }
+
+    if (code >= 32 && code < 127) {
+      inputBuf += data;
+      drawScreen();
+    }
   });
 }
