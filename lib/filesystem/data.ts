@@ -286,6 +286,9 @@ Data monetization platform — co-founded in 2020.
 - Connects data providers with buyers through a marketplace
 - Handles consent, privacy, and compliance
 
+## Notable
+- Participated in NYU Startup Sprint (Summer 2022)
+
 ## Tech Stack
 - Django + DRF (backend API)
 - Next.js + React (frontend)
