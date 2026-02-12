@@ -30,10 +30,6 @@ export function startVim(ctx: TerminalContext): void {
         const line = 'VIM - Vi IMproved';
         const pad = Math.max(0, Math.floor((cols - line.length) / 2));
         term.write(`${ANSI.bold}${ANSI.white}~${' '.repeat(pad - 1)}${line}${ANSI.reset}\r\n`);
-      } else if (r === Math.floor(rows / 2)) {
-        const line = 'type :q to exit';
-        const pad = Math.max(0, Math.floor((cols - line.length) / 2));
-        term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}${' '.repeat(pad - 1)}${ANSI.dim}${line}${ANSI.reset}\r\n`);
       } else {
         term.write(`${ANSI.bold}${ANSI.white}~${ANSI.reset}\r\n`);
       }
