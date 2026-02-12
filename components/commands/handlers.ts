@@ -323,7 +323,7 @@ export function neofetchCommand(): string {
     `${ANSI.cyan}│${ANSI.reset}${padEndVisible(content, W)}${ANSI.cyan}│${ANSI.reset}`;
 
   return [
-    `${ANSI.cyan}╭─────────────── ${ANSI.white}otis@otisscott.me${ANSI.cyan} ───────────────╮${ANSI.reset}`,
+    `${ANSI.cyan}╭────────────── ${ANSI.white}otismscott@gmail.com${ANSI.cyan} ──────────────╮${ANSI.reset}`,
     row(''),
     row(`   ${ANSI.blue}╭─────╮${ANSI.reset}  ${ANSI.bold}OS:${ANSI.reset} ${os} / Web Browser`),
     row(`   ${ANSI.blue}│${ANSI.reset}     ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Shell:${ANSI.reset} xterm.js`),
