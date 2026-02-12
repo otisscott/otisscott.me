@@ -28,7 +28,7 @@ import {
   getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
-import { ANSI } from '@/lib/filesystem/types';
+import { ANSI, padEndVisible } from '@/lib/filesystem/types';
 
 interface TerminalProps {
   onCommand?: (command: string) => void;
@@ -58,6 +58,12 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     if (xtermRef.current) {
       const prompt = generateShortPrompt();
       xtermRef.current.write(prompt);
+    }
+  }, []);
+
+  const writeOutput = useCallback((output: string) => {
+    if (xtermRef.current && output) {
+      xtermRef.current.write('\r\n' + output.replace(/\n/g, '\r\n'));
     }
   }, []);
 
@@ -127,79 +133,62 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
 
       switch (cmd) {
         case 'help':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(helpCommand());
+          writeOutput(helpCommand());
           break;
         case 'clear':
           xtermRef.current?.clear();
           break;
         case 'date':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(dateCommand());
+          writeOutput(dateCommand());
           break;
         case 'pwd':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(pwdCommand());
+          writeOutput(pwdCommand());
           break;
         case 'whoami':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(whoamiCommand());
+          writeOutput(whoamiCommand());
           break;
         case 'ls':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(lsCommand(args));
+          writeOutput(lsCommand(args));
           break;
         case 'cd':
           const cdResult = cdCommand(args);
           if (cdResult) {
-            xtermRef.current?.writeln('');
-            xtermRef.current?.writeln(cdResult);
+            writeOutput(cdResult);
           }
           break;
         case 'cat':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(catCommand(args));
+          writeOutput(catCommand(args));
           break;
         case 'echo':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(echoCommand(args));
+          writeOutput(echoCommand(args));
           break;
         case 'skills':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(skillsCommand());
+          writeOutput(skillsCommand());
           break;
         case 'experience':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(experienceCommand());
+          writeOutput(experienceCommand());
           break;
         case 'contact':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(contactCommand());
+          writeOutput(contactCommand());
           break;
         case 'projects':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(projectsCommand());
+          writeOutput(projectsCommand());
           break;
         case 'gs':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(gsCommand());
+          writeOutput(gsCommand());
           break;
         case 'gl':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(glCommand());
+          writeOutput(glCommand());
           break;
         case 'neofetch':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(neofetchCommand());
+          writeOutput(neofetchCommand());
           break;
         case 'cowsay':
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(cowsayCommand(args));
+          writeOutput(cowsayCommand(args));
           break;
         default:
           setExitCode(1);
-          xtermRef.current?.writeln('');
-          xtermRef.current?.writeln(`${ANSI.red}zsh: command not found: ${cmd}${ANSI.reset}`);
+          writeOutput(`${ANSI.red}zsh: command not found: ${cmd}${ANSI.reset}`);
       }
     }
 
@@ -207,7 +196,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     cursorPositionRef.current = 0;
     tabPressCountRef.current = 0;
     writePrompt();
-  }, [onCommand, writePrompt]);
+  }, [onCommand, writePrompt, writeOutput]);
 
   useLayoutEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
@@ -239,15 +228,19 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
 
     // Write welcome message
     const writeWelcome = () => {
+      const W = 56; // inner width between | borders
+      const brow = (content: string) =>
+        `${ANSI.cyan}  |${ANSI.reset}${padEndVisible(content, W)}${ANSI.cyan}|${ANSI.reset}`;
+
       term.writeln('');
-      term.writeln(`${ANSI.cyan}  +--------------------------------------------------------+${ANSI.reset}`);
-      term.writeln(`${ANSI.cyan}  |                                                        |${ANSI.reset}`);
-      term.writeln(`${ANSI.cyan}  |${ANSI.reset}   Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset} - Terminal Portfolio      ${ANSI.cyan}|${ANSI.reset}`);
-      term.writeln(`${ANSI.cyan}  |                                                        |${ANSI.reset}`);
-      term.writeln(`${ANSI.cyan}  |${ANSI.reset}   Type ${ANSI.green}help${ANSI.reset} to see available commands                ${ANSI.cyan}|${ANSI.reset}`);
-      term.writeln(`${ANSI.cyan}  |${ANSI.reset}   Try ${ANSI.green}neofetch${ANSI.reset} or ${ANSI.green}cowsay${ANSI.reset} for some fun!               ${ANSI.cyan}|${ANSI.reset}`);
-      term.writeln(`${ANSI.cyan}  |                                                        |${ANSI.reset}`);
-      term.writeln(`${ANSI.cyan}  +--------------------------------------------------------+${ANSI.reset}`);
+      term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
+      term.writeln(brow(''));
+      term.writeln(brow(`   Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset} - Terminal Portfolio`));
+      term.writeln(brow(''));
+      term.writeln(brow(`   Type ${ANSI.green}help${ANSI.reset} to see available commands`));
+      term.writeln(brow(`   Try ${ANSI.green}neofetch${ANSI.reset} or ${ANSI.green}cowsay${ANSI.reset} for some fun!`));
+      term.writeln(brow(''));
+      term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
       term.writeln('');
 
       writeShortPrompt();

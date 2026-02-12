@@ -4,7 +4,7 @@
  */
 
 import { fileSystem } from '@/lib/filesystem';
-import { ANSI, PromptColors } from '@/lib/filesystem/types';
+import { ANSI, PromptColors, padEndVisible } from '@/lib/filesystem/types';
 import { rootDirectory, fakeCommits, NODE_VERSION } from '@/lib/filesystem/data';
 import { DirectoryNode, FileNode } from '@/lib/filesystem/types';
 
@@ -25,7 +25,7 @@ export function generatePrompt(): string {
   const gitBranch = 'main'; // Simulated git branch
   const errorIndicator = lastExitCode !== 0 ? `${PromptColors.error}✘ ${PromptColors.reset}` : '';
 
-  return `${errorIndicator}${PromptColors.directory}${currentPath}${PromptColors.reset} ${PromptColors.gitBranch}on ${gitBranch}${PromptColors.reset} ${PromptColors.nodeVersion}via ⬢ ${NODE_VERSION}${PromptColors.reset} \n${PromptColors.promptSymbol}❯${PromptColors.reset} `;
+  return `${errorIndicator}${PromptColors.directory}${currentPath}${PromptColors.reset} ${PromptColors.gitBranch}on ${gitBranch}${PromptColors.reset} ${PromptColors.nodeVersion}via ⬢ ${NODE_VERSION}${PromptColors.reset} \r\n${PromptColors.promptSymbol}❯${PromptColors.reset} `;
 }
 
 // Generate short prompt (for initial display)
@@ -154,7 +154,7 @@ function renderMarkdown(content: string): string {
 export function whoamiCommand(): string {
   return `${ANSI.bold}${ANSI.brightCyan}Otis Scott${ANSI.reset}
 ${ANSI.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${ANSI.reset}
-${ANSI.white}Software Engineer • Open Source Enthusiast • Terminal Addict${ANSI.reset}`;
+${ANSI.white}Director of Technology @ Manhattan Wine Company${ANSI.reset}`;
 }
 
 // Skills command
@@ -221,7 +221,7 @@ export function contactCommand(): string {
   let output = `${ANSI.bold}Get In Touch${ANSI.reset}\n${ANSI.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${ANSI.reset}\n\n`;
 
   output += `${ANSI.cyan}📧 Email${ANSI.reset}\n`;
-  output += `   ${ANSI.white}hello@otisscott.me${ANSI.reset}\n\n`;
+  output += `   ${ANSI.white}otismscott@gmail.com${ANSI.reset}\n\n`;
 
   const socialContent = fileSystem.readFile('contact/social.json');
   if (socialContent) {
@@ -318,15 +318,21 @@ export function neofetchCommand(): string {
              userAgent.includes('Win') ? 'Windows' :
              userAgent.includes('Linux') ? 'Linux' : 'Unknown OS';
 
-  return `${ANSI.cyan}╭─────────────── ${ANSI.white}otis@otisscott.me${ANSI.cyan} ───────────────╮${ANSI.reset}
-${ANSI.cyan}│${ANSI.reset}                                                 ${ANSI.cyan}│${ANSI.reset}
-${ANSI.cyan}│${ANSI.reset}   ${ANSI.blue}╭─────╮${ANSI.reset}  ${ANSI.bold}OS:${ANSI.reset} ${os} / Web Browser              ${ANSI.cyan}│${ANSI.reset}
-${ANSI.cyan}│${ANSI.reset}   ${ANSI.blue}│${ANSI.reset}     ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Shell:${ANSI.reset} xterm.js                      ${ANSI.cyan}│${ANSI.reset}
-${ANSI.cyan}│${ANSI.reset}   ${ANSI.blue}│${ANSI.reset}  ${ANSI.white}O${ANSI.reset}  ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Terminal:${ANSI.reset} otisscott.me               ${ANSI.cyan}│${ANSI.reset}
-${ANSI.cyan}│${ANSI.reset}   ${ANSI.blue}│${ANSI.reset}     ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Theme:${ANSI.reset} Tokyo Night                   ${ANSI.cyan}│${ANSI.reset}
-${ANSI.cyan}│${ANSI.reset}   ${ANSI.blue}╰─────╯${ANSI.reset}  ${ANSI.bold}Uptime:${ANSI.reset} ${uptimeStr}                      ${ANSI.cyan}│${ANSI.reset}
-${ANSI.cyan}│${ANSI.reset}                                                 ${ANSI.cyan}│${ANSI.reset}
-${ANSI.cyan}╰─────────────────────────────────────────────────╯${ANSI.reset}`;
+  const W = 49; // inner width between │ borders
+  const row = (content: string) =>
+    `${ANSI.cyan}│${ANSI.reset}${padEndVisible(content, W)}${ANSI.cyan}│${ANSI.reset}`;
+
+  return [
+    `${ANSI.cyan}╭─────────────── ${ANSI.white}otis@otisscott.me${ANSI.cyan} ───────────────╮${ANSI.reset}`,
+    row(''),
+    row(`   ${ANSI.blue}╭─────╮${ANSI.reset}  ${ANSI.bold}OS:${ANSI.reset} ${os} / Web Browser`),
+    row(`   ${ANSI.blue}│${ANSI.reset}     ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Shell:${ANSI.reset} xterm.js`),
+    row(`   ${ANSI.blue}│${ANSI.reset}  ${ANSI.white}O${ANSI.reset}  ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Terminal:${ANSI.reset} otisscott.me`),
+    row(`   ${ANSI.blue}│${ANSI.reset}     ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Theme:${ANSI.reset} Tokyo Night`),
+    row(`   ${ANSI.blue}╰─────╯${ANSI.reset}  ${ANSI.bold}Uptime:${ANSI.reset} ${uptimeStr}`),
+    row(''),
+    `${ANSI.cyan}╰${'─'.repeat(W)}╯${ANSI.reset}`,
+  ].join('\n');
 }
 
 // Cowsay command
