@@ -528,21 +528,34 @@ export function openCommand(args: string[]): { output: string; url?: string } {
 }
 
 // AI coding tool easter eggs
-export function claudeCommand(): string {
-  return `
-${ANSI.magenta}╭──────────────────────────────────────────────╮${ANSI.reset}
-${ANSI.magenta}│${ANSI.reset} ${ANSI.magenta}✻${ANSI.reset} ${ANSI.bold}Welcome to Claude Code!${ANSI.reset}                    ${ANSI.magenta}│${ANSI.reset}
-${ANSI.magenta}│${ANSI.reset}                                              ${ANSI.magenta}│${ANSI.reset}
-${ANSI.magenta}│${ANSI.reset}   ${ANSI.dim}/help${ANSI.reset} for help                            ${ANSI.magenta}│${ANSI.reset}
-${ANSI.magenta}│${ANSI.reset}                                              ${ANSI.magenta}│${ANSI.reset}
-${ANSI.magenta}│${ANSI.reset}   ${ANSI.dim}cwd:${ANSI.reset} ~/Projects/otisscott.me              ${ANSI.magenta}│${ANSI.reset}
-${ANSI.magenta}╰──────────────────────────────────────────────╯${ANSI.reset}
+const ORANGE = '\x1b[38;5;208m';
 
-${ANSI.dim}  model: claude-opus-4-6${ANSI.reset}
-${ANSI.dim}  context: 200k tokens${ANSI.reset}
+export function claudeCommand(cols: number): string {
+  const W = Math.max(60, cols - 2); // full width minus outer padding
+  const LW = Math.min(34, Math.floor(W * 0.4));
+  const RW = W - LW - 1; // -1 for middle divider
+  const o = ORANGE;
+  const r = ANSI.reset;
+  const row = (left: string, right: string) =>
+    `${o}│${r}${padEndVisible(left, LW)}${o}│${r}${padEndVisible(right, RW)}${o}│${r}`;
 
-${ANSI.green}  This site was built with Claude Code.${ANSI.reset}
-${ANSI.dim}  (But you can't run it here — this is a website.)${ANSI.reset}`;
+  const titleText = '─── Claude Code v2.1.39 ';
+  const topFill = Math.max(0, W - titleText.length - 1);
+
+  return [
+    '',
+    `${o}╭${titleText}${'─'.repeat(topFill)}╮${r}`,
+    row('', ` ${ANSI.bold}Tips for getting started${r}`),
+    row(`      ${ANSI.bold}Welcome back, Otis!${r}`, ` Run ${ANSI.cyan}/init${r} to create a CLAUDE.md file`),
+    row('', ` with instructions for Claude`),
+    row('', ` ${ANSI.dim}${'─'.repeat(RW - 2)}${r}`),
+    row(`${' '.repeat(Math.max(0, Math.floor((LW - 7) / 2)))}${ANSI.magenta}▐▛███▜▌${r}`, ` ${ANSI.dim}Recent activity${r}`),
+    row(`${' '.repeat(Math.max(0, Math.floor((LW - 9) / 2)))}${ANSI.magenta}▝▜█████▛▘${r}`, ` ${ANSI.dim}No recent activity${r}`),
+    row(`${' '.repeat(Math.max(0, Math.floor((LW - 6) / 2)))}${ANSI.magenta}▘▘ ▝▝${r}`, ''),
+    row(`${' '.repeat(Math.max(0, Math.floor((LW - 21) / 2)))}${ANSI.dim}Opus 4.6 · Claude Max${r}`, ''),
+    row(`${' '.repeat(Math.max(0, Math.floor((LW - 23) / 2)))}${ANSI.dim}~/Projects/otisscott.me${r}`, ''),
+    `${o}╰${'─'.repeat(W)}╯${r}`,
+  ].join('\n');
 }
 
 export function codexCommand(): string {

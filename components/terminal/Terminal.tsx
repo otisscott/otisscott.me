@@ -333,7 +333,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           break;
         case 'claude':
         case 'claude-code':
-          writeOutput(claudeCommand());
+          writeOutput(claudeCommand(xtermRef.current?.cols || 80));
           break;
         case 'codex':
           writeOutput(codexCommand());
