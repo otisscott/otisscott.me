@@ -527,6 +527,49 @@ export function openCommand(args: string[]): { output: string; url?: string } {
   return { output: `${ANSI.dim}No URL found in ${target}${ANSI.reset}` };
 }
 
+// AI coding tool easter eggs
+export function claudeCommand(): string {
+  return `${ANSI.bold}${ANSI.magenta}  ╭─────────────────────────────────────╮
+  │      ${ANSI.white}Claude Code${ANSI.magenta}                      │
+  │      ${ANSI.dim}by Anthropic${ANSI.reset}${ANSI.magenta}                      │
+  │                                     │
+  │  ${ANSI.green}✓${ANSI.magenta} ${ANSI.white}This site was built with me.${ANSI.magenta}     │
+  │  ${ANSI.cyan}⚡${ANSI.magenta} ${ANSI.dim}opus-4-6 · agentic coding${ANSI.reset}${ANSI.magenta}       │
+  ╰─────────────────────────────────────╯${ANSI.reset}`;
+}
+
+export function codexCommand(): string {
+  return `${ANSI.dim}codex: command not found
+${ANSI.reset}${ANSI.yellow}Did you mean: ${ANSI.bold}claude${ANSI.reset}${ANSI.yellow}?${ANSI.reset}
+${ANSI.dim}(We use the good stuff around here)${ANSI.reset}`;
+}
+
+export function opencodeCommand(): string {
+  return `${ANSI.dim}opencode: command not found
+${ANSI.reset}${ANSI.yellow}Did you mean: ${ANSI.bold}claude${ANSI.reset}${ANSI.yellow}?${ANSI.reset}
+${ANSI.dim}(Nice try though)${ANSI.reset}`;
+}
+
+// Package manager easter eggs
+export function packageManagerCommand(cmd: string): string {
+  const msgs: Record<string, string> = {
+    npm: `${ANSI.red}npm${ANSI.reset} ${ANSI.dim}ERR!${ANSI.reset} This is a website, not a Node.js environment.
+${ANSI.red}npm${ANSI.reset} ${ANSI.dim}ERR!${ANSI.reset} But if it were, we'd be using ${ANSI.bold}bun${ANSI.reset}.`,
+    npx: `${ANSI.red}npm${ANSI.reset} ${ANSI.dim}ERR!${ANSI.reset} npx: command not available in browser.
+${ANSI.red}npm${ANSI.reset} ${ANSI.dim}ERR!${ANSI.reset} Try ${ANSI.bold}bunx${ANSI.reset} instead. ${ANSI.dim}(Just kidding, this is a website.)${ANSI.reset}`,
+    bun: `${ANSI.bold}bun${ANSI.reset} ${ANSI.dim}v1.2.x${ANSI.reset}
+${ANSI.green}✓${ANSI.reset} Speed is everything. ${ANSI.dim}That's why this site uses it.${ANSI.reset}
+${ANSI.dim}But you can't run it here — this is a terminal portfolio, not a runtime.${ANSI.reset}`,
+    bunx: `${ANSI.bold}bun${ANSI.reset} ${ANSI.dim}v1.2.x${ANSI.reset}
+${ANSI.green}✓${ANSI.reset} Speed is everything. ${ANSI.dim}That's why this site uses it.${ANSI.reset}
+${ANSI.dim}But you can't run it here — this is a terminal portfolio, not a runtime.${ANSI.reset}`,
+    uv: `${ANSI.bold}${ANSI.green}uv${ANSI.reset} ${ANSI.dim}An extremely fast Python package manager.${ANSI.reset}
+${ANSI.green}✓${ANSI.reset} Preferred over pip in this household.
+${ANSI.dim}No Python environment here though — just vibes.${ANSI.reset}`,
+  };
+  return msgs[cmd] || `${ANSI.red}${cmd}: command not found${ANSI.reset}`;
+}
+
 // Tab completion
 export function getCompletions(input: string): { completions: string[]; prefix: string } {
   const trimmed = input.trim();
