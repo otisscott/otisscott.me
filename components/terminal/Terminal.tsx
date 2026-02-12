@@ -34,10 +34,12 @@ import {
   historyCommand,
   openCommand,
   packageManagerCommand,
+  uptimeCommand,
+  dockerCommand,
   getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
-import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode } from '@/components/commands/interactive';
+import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode, startSsh, startHtop, startMake } from '@/components/commands/interactive';
 import { ANSI, padEndVisible } from '@/lib/filesystem/types';
 
 interface TerminalProps {
@@ -60,6 +62,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const currentThemeRef = useRef('tokyo-night');
   const colorModeRef = useRef<ColorMode>('dark');
   const interactiveModeRef = useRef<((data: string) => void) | null>(null);
+  const loadTimeRef = useRef(Date.now());
 
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
@@ -354,6 +357,31 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         case 'opencode':
           if (xtermRef.current) {
             startOpencode(getTerminalContext());
+            return;
+          }
+          break;
+        case 'uptime':
+          writeOutput(uptimeCommand(loadTimeRef.current));
+          break;
+        case 'docker':
+          writeOutput(dockerCommand(args));
+          break;
+        case 'ssh':
+          if (xtermRef.current) {
+            startSsh(getTerminalContext());
+            return;
+          }
+          break;
+        case 'htop':
+        case 'top':
+          if (xtermRef.current) {
+            startHtop(getTerminalContext(), loadTimeRef.current);
+            return;
+          }
+          break;
+        case 'make':
+          if (xtermRef.current) {
+            startMake(getTerminalContext());
             return;
           }
           break;

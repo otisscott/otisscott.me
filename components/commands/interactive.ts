@@ -523,3 +523,168 @@ export function startOpencode(ctx: TerminalContext): void {
     }
   });
 }
+
+// ─── Dev Tool Easter Eggs ────────────────────────────────────────────
+
+/**
+ * SSH connection animation — fire-and-forget (like rm -rf pattern)
+ */
+export function startSsh(ctx: TerminalContext): void {
+  const { term, resetInput, writePrompt } = ctx;
+
+  const steps = [
+    { text: `${ANSI.dim}ssh otis@otisscott.me${ANSI.reset}`, delay: 0 },
+    { text: `Connecting to otisscott.me...`, delay: 400 },
+    { text: `${ANSI.dim}Key exchange: curve25519-sha256${ANSI.reset}`, delay: 800 },
+    { text: `${ANSI.dim}Host key: SHA256:xT3rm1n4lP0rtf0l10${ANSI.reset}`, delay: 400 },
+    { text: `${ANSI.green}Authentication successful.${ANSI.reset}`, delay: 600 },
+    { text: `${ANSI.dim}Establishing session...${ANSI.reset}`, delay: 500 },
+    { text: '', delay: 300 },
+    { text: `${ANSI.bold}Welcome to otisscott.me.${ANSI.reset} ${ANSI.dim}You're already here.${ANSI.reset}`, delay: 0 },
+  ];
+
+  let i = 0;
+  const next = () => {
+    if (i < steps.length) {
+      term.write(`\r\n${steps[i].text}`);
+      i++;
+      if (i < steps.length) {
+        setTimeout(next, steps[i].delay);
+      } else {
+        resetInput();
+        writePrompt();
+      }
+    }
+  };
+  setTimeout(next, steps[0].delay || 200);
+}
+
+/**
+ * htop — full-screen takeover, press q or F10 to exit (like vim pattern)
+ */
+export function startHtop(ctx: TerminalContext, loadTime: number): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+  const cols = term.cols;
+  const rows = term.rows;
+
+  const processes = [
+    { pid: 1, user: 'otis', cpu: '12.3', mem: '4.2', cmd: `${ANSI.green}xterm-renderer${ANSI.reset}` },
+    { pid: 42, user: 'otis', cpu: '8.7', mem: '3.1', cmd: `${ANSI.green}theme-engine${ANSI.reset}` },
+    { pid: 101, user: 'otis', cpu: '5.4', mem: '2.8', cmd: `${ANSI.cyan}next-dev-server${ANSI.reset}` },
+    { pid: 137, user: 'root', cpu: '3.2', mem: '1.5', cmd: `${ANSI.dim}cowsay-daemon${ANSI.reset}` },
+    { pid: 256, user: 'otis', cpu: '2.1', mem: '1.2', cmd: `${ANSI.dim}neofetch-worker${ANSI.reset}` },
+    { pid: 314, user: 'otis', cpu: '1.8', mem: '0.9', cmd: `${ANSI.dim}portfolio-watcher${ANSI.reset}` },
+    { pid: 420, user: 'root', cpu: '0.5', mem: '0.3', cmd: `${ANSI.dim}easter-egg-loader${ANSI.reset}` },
+    { pid: 512, user: 'otis', cpu: '0.2', mem: '0.1', cmd: `${ANSI.dim}git-status-poller${ANSI.reset}` },
+  ];
+
+  const drawBar = (pct: number, width: number, color: string): string => {
+    const filled = Math.round((pct / 100) * width);
+    const empty = width - filled;
+    return `${color}${'|'.repeat(filled)}${ANSI.reset}${ANSI.dim}${' '.repeat(empty)}${ANSI.reset}`;
+  };
+
+  const drawScreen = () => {
+    const now = Date.now();
+    const diffMs = now - loadTime;
+    const totalSec = Math.floor(diffMs / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    const uptimeStr = min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `0:${String(sec).padStart(2, '0')}`;
+
+    const barW = Math.min(30, cols - 20);
+
+    term.write('\x1b[2J\x1b[H');
+
+    // Header
+    term.write(`  ${ANSI.bold}CPU${ANSI.reset}[${drawBar(38, barW, ANSI.green)}${ANSI.dim} 38.2%${ANSI.reset}]\r\n`);
+    term.write(`  ${ANSI.bold}Mem${ANSI.reset}[${drawBar(24, barW, ANSI.cyan)}${ANSI.dim} 24.1%${ANSI.reset}]\r\n`);
+    term.write(`\r\n`);
+    term.write(`  ${ANSI.dim}Tasks: ${ANSI.reset}${ANSI.bold}${processes.length}${ANSI.reset}${ANSI.dim}; Uptime: ${uptimeStr}${ANSI.reset}\r\n`);
+    term.write(`\r\n`);
+
+    // Process header
+    const header = `${ANSI.bold}\x1b[7m  PID USER      CPU%  MEM%  COMMAND${' '.repeat(Math.max(0, cols - 36))}\x1b[27m${ANSI.reset}`;
+    term.write(header + '\r\n');
+
+    // Processes
+    const maxProcs = Math.min(processes.length, rows - 9);
+    for (let i = 0; i < maxProcs; i++) {
+      const p = processes[i];
+      const line = `  ${String(p.pid).padStart(3)} ${p.user.padEnd(9)} ${p.cpu.padStart(5)} ${p.mem.padStart(5)}  ${p.cmd}`;
+      term.write(line + '\r\n');
+    }
+
+    // Fill remaining rows
+    for (let i = maxProcs + 7; i < rows - 1; i++) {
+      term.write('\r\n');
+    }
+
+    // Footer
+    const footer = `${ANSI.bold}\x1b[7m F1${ANSI.reset}\x1b[7mHelp ${ANSI.bold}F5${ANSI.reset}\x1b[7mTree ${ANSI.bold}F9${ANSI.reset}\x1b[7mKill ${ANSI.bold}F10${ANSI.reset}\x1b[7mQuit${' '.repeat(Math.max(0, cols - 28))}\x1b[27m`;
+    term.write(footer);
+  };
+
+  drawScreen();
+
+  // Refresh every 2 seconds to update uptime
+  const refreshInterval = setInterval(drawScreen, 2000);
+
+  setInteractiveMode((data: string) => {
+    const code = data.charCodeAt(0);
+
+    if (data === 'q' || data === 'Q' || code === 3) {
+      clearInterval(refreshInterval);
+      setInteractiveMode(null);
+      term.write('\x1b[2J\x1b[H');
+      term.writeln(`${ANSI.dim}(Exited htop)${ANSI.reset}`);
+      resetInput();
+      writePrompt();
+      return;
+    }
+
+    // F10 key (ESC [ 21 ~)
+    if (data === '\x1b[21~') {
+      clearInterval(refreshInterval);
+      setInteractiveMode(null);
+      term.write('\x1b[2J\x1b[H');
+      term.writeln(`${ANSI.dim}(Exited htop)${ANSI.reset}`);
+      resetInput();
+      writePrompt();
+    }
+  });
+}
+
+/**
+ * make — build animation, fire-and-forget (like rm -rf pattern)
+ */
+export function startMake(ctx: TerminalContext): void {
+  const { term, resetInput, writePrompt } = ctx;
+
+  const steps = [
+    { text: `${ANSI.dim}make[1]: Entering directory '~/Projects/otisscott.me'${ANSI.reset}`, delay: 300 },
+    { text: `Compiling components...`, delay: 600 },
+    { text: `${ANSI.dim}  cc -o about.o about.tsx${ANSI.reset}`, delay: 200 },
+    { text: `${ANSI.dim}  cc -o terminal.o Terminal.tsx${ANSI.reset}`, delay: 250 },
+    { text: `Linking experience.o skills.o projects.o...`, delay: 700 },
+    { text: `Bundling assets...`, delay: 500 },
+    { text: `Optimizing portfolio...`, delay: 800 },
+    { text: '', delay: 200 },
+    { text: `${ANSI.green}Build complete. 0 errors, 0 warnings.${ANSI.reset}`, delay: 0 },
+  ];
+
+  let i = 0;
+  const next = () => {
+    if (i < steps.length) {
+      term.write(`\r\n${steps[i].text}`);
+      i++;
+      if (i < steps.length) {
+        setTimeout(next, steps[i].delay);
+      } else {
+        resetInput();
+        writePrompt();
+      }
+    }
+  };
+  setTimeout(next, steps[0].delay || 200);
+}

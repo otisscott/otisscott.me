@@ -676,6 +676,68 @@ export function opencodeCommand(cols: number): string {
   ].join('\n');
 }
 
+// Uptime command
+export function uptimeCommand(loadTime: number): string {
+  const now = Date.now();
+  const diffMs = now - loadTime;
+  const totalSec = Math.floor(diffMs / 1000);
+  const min = Math.floor(totalSec / 60);
+  const hours = Math.floor(min / 60);
+
+  const upStr = hours > 0
+    ? `${hours} hour${hours !== 1 ? 's' : ''}, ${min % 60} min`
+    : min > 0
+    ? `${min} min`
+    : `${totalSec} sec`;
+
+  const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  return ` ${timeStr} up ${upStr},  1 user,  load average: 0.42, 0.15, 0.08`;
+}
+
+// Docker command with subcommands
+export function dockerCommand(args: string[]): string {
+  const sub = args[0];
+  if (!sub) {
+    return `Usage: docker [command]
+
+${ANSI.bold}Commands:${ANSI.reset}
+  ps          List containers
+  images      List images
+  run         Run a container
+  compose     Docker Compose
+
+${ANSI.dim}hint: try 'docker ps' or 'docker images'${ANSI.reset}`;
+  }
+
+  switch (sub) {
+    case 'ps':
+      return `${ANSI.bold}CONTAINER ID   IMAGE                  STATUS          NAMES${ANSI.reset}
+${ANSI.green}a1b2c3d4e5f6${ANSI.reset}   otisscott-me:latest    Up 42 minutes   ${ANSI.cyan}portfolio${ANSI.reset}
+${ANSI.green}f6e5d4c3b2a1${ANSI.reset}   theme-engine:1.0       Up 42 minutes   ${ANSI.cyan}theme-engine${ANSI.reset}
+${ANSI.green}1a2b3c4d5e6f${ANSI.reset}   xterm-renderer:3.2     Up 42 minutes   ${ANSI.cyan}xterm-renderer${ANSI.reset}`;
+    case 'images':
+      return `${ANSI.bold}REPOSITORY          TAG       SIZE${ANSI.reset}
+otisscott-me        latest    42MB
+theme-engine        1.0       8MB
+xterm-renderer      3.2       15MB
+${ANSI.dim}cowsay              moo       1MB${ANSI.reset}`;
+    case 'run':
+      return `${ANSI.red}Error: permission denied${ANSI.reset}\n${ANSI.dim}hint: you can look, but you can't touch${ANSI.reset}`;
+    case 'compose':
+      if (args[1] === 'up') {
+        return `${ANSI.green}[+] Running 3/3${ANSI.reset}
+ ${ANSI.green}✔${ANSI.reset} Container portfolio       ${ANSI.green}Started${ANSI.reset}
+ ${ANSI.green}✔${ANSI.reset} Container theme-engine    ${ANSI.green}Started${ANSI.reset}
+ ${ANSI.green}✔${ANSI.reset} Container xterm-renderer  ${ANSI.green}Started${ANSI.reset}
+${ANSI.dim}Everything's already running. You're on the site.${ANSI.reset}`;
+      }
+      return `Usage: docker compose [up|down|ps]`;
+    default:
+      return `docker: '${sub}' is not a docker command. See 'docker' for usage.`;
+  }
+}
+
 // Package manager easter eggs
 export function packageManagerCommand(cmd: string): string {
   const msgs: Record<string, string> = {
@@ -708,6 +770,7 @@ export function getCompletions(input: string): { completions: string[]; prefix: 
       'tree', 'grep', 'open', 'whoami', 'skills', 'experience',
       'contact', 'projects', 'history', 'ping', 'theme',
       'gs', 'gl', 'neofetch', 'cowsay', 'sudo', 'vim', 'exit', 'sl', 'rm',
+      'docker', 'ssh', 'htop', 'uptime', 'make',
     ];
     const matches = commands.filter(cmd => cmd.startsWith(trimmed));
     return { completions: matches, prefix: '' };
