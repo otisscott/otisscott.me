@@ -276,7 +276,7 @@ Fine asset management SaaS built by The American Storage Company for Manhattan W
 - PostgreSQL + Redis (data layer)
 - Docker (deployment)
 
-🔒 Internal — proprietary`),
+🔗 https://theamericanstoragecompany.com`),
     createFile('dataearn.md', `# DataEarn
 
 Data monetization platform — co-founded in 2020.
@@ -292,7 +292,7 @@ Data monetization platform — co-founded in 2020.
 - Azure (cloud infrastructure)
 - PostgreSQL (database)
 
-🔗 dataearn.com`),
+🔗 https://dataearn.com`),
     createFile('lwin-mapping.md', `# LWIN Mapping
 
 Shopify app for wine inventory and appraisal management.

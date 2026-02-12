@@ -506,13 +506,13 @@ export function openCommand(args: string[]): { output: string; url?: string } {
     return { output: `${ANSI.red}open: ${target}: No such file${ANSI.reset}` };
   }
 
-  const urlMatch = content.match(/https?:\/\/[^\s)]+/);
+  const urlMatch = content.match(/https?:\/\/[^\s"',)]+/);
   if (urlMatch) {
     return { output: `${ANSI.green}Opening ${urlMatch[0]}...${ANSI.reset}`, url: urlMatch[0] };
   }
 
   // Look for partial URLs like github.com/...
-  const partialMatch = content.match(/(?:github\.com|linkedin\.com|dataearn\.com)[^\s)]+/);
+  const partialMatch = content.match(/(?:github\.com|linkedin\.com|dataearn\.com|theamericanstoragecompany\.com)[^\s"',)]+/);
   if (partialMatch) {
     const url = `https://${partialMatch[0]}`;
     return { output: `${ANSI.green}Opening ${url}...${ANSI.reset}`, url };
