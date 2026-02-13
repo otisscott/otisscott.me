@@ -178,12 +178,8 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         // Command completion
         return completions[0].slice(input.length) + ' ';
       } else {
-        // Path completion
-        const cmd = parts[0];
-        const rest = parts.slice(1).join(' ');
-        const lastSlashIndex = rest.lastIndexOf('/');
-        const dirPart = lastSlashIndex >= 0 ? rest.slice(0, lastSlashIndex + 1) : '';
-        const completed = `${cmd} ${dirPart}${completions[0]}`;
+        // Path completion — completions already include full path
+        const completed = `${parts[0]} ${completions[0]}`;
         if (completed.startsWith(input)) {
           return completed.slice(input.length);
         }
