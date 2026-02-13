@@ -463,10 +463,9 @@ ${ANSI.dim}hint: try 'git log' or 'git blame about/bio.md'${ANSI.reset}`;
 }
 
 // Neofetch command — OS-specific ASCII art from neofetch source
-export function neofetchCommand(): string {
-  const loadTime = new Date();
-  const now = new Date();
-  const uptimeMs = now.getTime() - loadTime.getTime();
+export function neofetchCommand(loadTime: number): string {
+  const now = Date.now();
+  const uptimeMs = now - loadTime;
   const uptimeSec = Math.floor(uptimeMs / 1000);
   const uptimeMin = Math.floor(uptimeSec / 60);
   const uptimeHours = Math.floor(uptimeMin / 60);
