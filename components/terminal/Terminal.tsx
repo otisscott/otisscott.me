@@ -686,13 +686,8 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
             const prevCommand = commandHistoryRef.current[historyIndexRef.current];
             inputBufferRef.current = prevCommand;
             cursorPositionRef.current = prevCommand.length;
-            if (promptMultilineRef.current) {
-              // Clear both info line and prompt line
-              term.write('\x1b[A\r\x1b[J');
-              promptMultilineRef.current = false;
-            } else {
-              term.write('\r\x1b[K');
-            }
+            term.write('\r\x1b[K');
+            promptMultilineRef.current = false;
             writeShortPrompt();
             term.write(prevCommand);
           }
