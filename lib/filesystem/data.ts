@@ -263,71 +263,95 @@ For inquiries about:
   createDirectory('projects', [
     createFile('vault-os.md', `# Vault OS
 
-Fine asset management SaaS built by The American Storage Company for Manhattan Wine Company.
+Multi-tenant SaaS platform for fine asset storage and logistics — replacing a $90k/year legacy WMS.
 
 ## What It Does
-- Wine inventory tracking with LWIN integration
-- Client account management and portals
-- Warehouse operations (inbound/outbound, cycle counts)
-- Reporting and analytics
+- Immutable provenance tracking (every state change creates an audit event)
+- Dual-platform: internal WMS for warehouse ops + client portal for customers
+- Inventory management, inbound/outbound workflows, cycle counts
+- Multi-factor auth (TOTP, SMS, FIDO2 WebAuthn)
+- Custom domain mapping per tenant
 
 ## Tech Stack
-- Django + Django REST Framework (API)
-- React + TypeScript (frontend)
-- PostgreSQL + Redis (data layer)
-- Docker (deployment)
+- Django 6.0 + Django Ninja (API) — Python 3.14
+- React 19 + TypeScript 5.9 + Vite 7 (Bun monorepo)
+- PostgreSQL 18 + pgvector (semantic search) + Redis 7
+- Celery + RabbitMQ (async processing)
+- Tailwind 4 + Radix UI + TanStack Query/Table
+- Docker + OpenTofu (IaC on DigitalOcean)
+- 1Password CLI for zero-secrets-on-disk development
+- Sentry, GitHub Actions CI/CD
 
 🔗 https://theamericanstoragecompany.com`),
     createFile('dataearn.md', `# DataEarn
 
-Data monetization platform — co-founded in 2020.
+Data privacy and monetization platform — co-founded in 2020. Users upload data exports from major tech companies and get interactive dashboards showing exactly what was collected.
 
 ## What It Does
-- Allows users to monetize their personal data
-- Connects data providers with buyers through a marketplace
-- Handles consent, privacy, and compliance
+- Parses data exports from 10+ platforms (Facebook, Instagram, Uber, Spotify, TikTok, etc.)
+- Generates interactive "DataCards" — visualizations of your data footprint
+- 10,000+ lines of platform-specific parsing logic across JSON, CSV, and HTML formats
+- GDPR-compliant data deletion and privacy controls
+- Stripe-integrated payment system
 
 ## Notable
 - Participated in NYU Startup Sprint (Summer 2022)
+- 5,248-line Instagram parser handling 40+ data file types
 
 ## Tech Stack
-- Django + DRF (backend API)
-- Next.js + React (frontend)
-- Azure (cloud infrastructure)
-- PostgreSQL (database)
+- Django 4.1 + DRF with JWT auth (backend)
+- Next.js 12 + TypeScript + Chakra UI + Chart.js (frontend)
+- PostgreSQL + Azure Blob Storage + Azure App Service
+- Stripe payments, SendGrid emails, APScheduler cron
+- Azure Pipelines CI/CD + Application Insights monitoring
 
 🔗 https://dataearn.com`),
     createFile('lwin-mapping.md', `# LWIN Mapping
 
-Shopify app for wine inventory and appraisal management.
+Production Shopify embedded app for fine wine merchants. Automates inventory management by integrating the Liv-ex wine identification database.
 
 ## What It Does
-- Maps wine products to LWIN (London International Vintners Exchange) identifiers
-- Provides market value appraisals for wine inventory
-- Bulk import/export for catalog management
+- Bulk appraisal workflows — upload collections via Excel, auto-price with market data
+- Client collaboration portal with password-protected sharing and comments
+- Bulk product creation with 20+ wine-specific attributes from LWIN7 lookup
+- Real-time progress tracking via Server-Sent Events (SSE)
+- Shopify Admin extension for in-context "Create with LWIN" button
+- Allocation comparison tool — visual diffs across spreadsheets
 
 ## Tech Stack
-- React Router 7 (Remix)
-- Prisma (ORM)
-- Sentry (error tracking)
-- Shopify App Bridge
+- React Router 7 + TypeScript (full-stack)
+- PostgreSQL + Prisma (data layer)
+- Shopify App Bridge + Polaris + Admin GraphQL API
+- Liv-ex LWIN API (OAuth 2.0)
+- ExcelJS + PDFKit (file processing and reports)
+- Sentry (error tracking + session replay)
+- Vercel (deployment)
 
 🔒 Shopify App Store — in development`),
     createFile('sec-scraper.md', `# SEC Form ADV Scraper
 
-Open source tool for automated SEC filing consumption.
+Competitive intelligence tool that mines SEC investment adviser filings to identify vendor adoption across 70k+ registered firms.
 
 ## What It Does
-- Scrapes SEC EDGAR for Form ADV filings
-- Extracts structured data from XML and PDF documents
-- Handles rate limiting and incremental updates
+- Parses SEC's 73MB IA/BD DataDump XML (all registered investment advisers)
+- Downloads and extracts text from individual Form ADV PDF brochures
+- Identifies competitor software usage (ComplianceSci, Orion, ACA, etc.)
+- Smart resume logic — restarts from last processed firm on interruption
+- Filters by employee count, valid website, and target vendor mentions
+
+## How It Works
+Scheduled XML pull from SEC EDGAR → filter firms → Selenium downloads PDFs
+→ pypdf extraction → regex matching on "books and records" section → CSV
+
+Originally ran automated scheduled pulls to keep the dataset current,
+until SEC rate limiting started causing IP bans.
 
 ## Tech Stack
-- Python
-- XML/PDF parsing
-- SEC EDGAR API
+- Python + pandas
+- pypdf + BeautifulSoup (PDF/HTML parsing)
+- Selenium + pyvirtualdisplay (headless browser for SEC pages)
 
-🔗 github.com/otisscott`),
+🔗 github.com/otisscott/sec_scraping`),
     createFile('terminal-portfolio.md', `# Terminal Portfolio
 
 **This website!**
@@ -350,18 +374,19 @@ A terminal-inspired portfolio built with Next.js and xterm.js.
 🔗 github.com/otisscott/otisscott.me`),
     createFile('dotfiles.md', `# Dotfiles
 
-Heavily documented personal configuration.
+800+ config files across Neovim, Zsh, Claude Code, and system tools.
 
 ## Includes
-- Neovim config (LSP, Treesitter, custom keymaps)
-- Zsh config (979 lines of aliases, functions, prompts)
-- Claude Code rules and agent configuration
-- tmux, git, and tool configs
+- Neovim — Lua config with LSP, Treesitter, lazy.nvim, Tokyo Night
+- Zsh — Oh My Zsh + Pure theme, 187 aliases, zoxide, atuin history
+- Claude Code — 48 specialized agents, 141 custom skills, 17 behavior rules
+- Git, Ghostty, AeroSpace (tiling WM), and tool configs
 
 ## Highlights
-- Modular Neovim setup with lazy.nvim
-- Custom Zsh prompt with git integration
-- Extensive Claude Code skill library
+- Claude Code agent orchestration framework (Oracle, Scout, Phoenix, Maestro, etc.)
+- Event-driven hooks for context injection, memory awareness, and session continuity
+- Knowledge management system with semantic search and crystallization
+- Cross-platform install scripts (macOS/Linux/WSL)
 
 🔗 github.com/otisscott/dotfiles`),
   ]),
