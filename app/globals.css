@@ -134,6 +134,11 @@ a:hover {
   outline: none;
 }
 
+/* Hide native mobile caret on xterm's hidden textarea */
+.xterm textarea {
+  caret-color: transparent !important;
+}
+
 /* Cursor Styles */
 .xterm-cursor {
   background-color: var(--fg-bright) !important;
