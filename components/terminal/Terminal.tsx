@@ -335,7 +335,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         case 'vi':
         case 'nano':
           if (xtermRef.current) {
-            startVim(getTerminalContext());
+            startVim(getTerminalContext(), args[0]);
             return;
           }
           break;

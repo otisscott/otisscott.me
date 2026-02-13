@@ -6,7 +6,8 @@
  */
 
 import { Terminal as XTerm } from '@xterm/xterm';
-import { ANSI, padEndVisible } from '@/lib/filesystem/types';
+import { ANSI, padEndVisible, visibleLength } from '@/lib/filesystem/types';
+import { fileSystem } from '@/lib/filesystem/index';
 
 interface TerminalContext {
   term: XTerm;
@@ -16,13 +17,37 @@ interface TerminalContext {
 }
 
 /**
- * Vim easter egg — full-screen takeover, requires :q/:wq/ZZ to exit
+ * Vim file editor / easter egg
+ * With a filepath: opens file from virtual filesystem with navigation & insert mode
+ * Without a filepath: classic vim escape room easter egg
  */
-export function startVim(ctx: TerminalContext): void {
+export function startVim(ctx: TerminalContext, filepath?: string): void {
   const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
   const cols = term.cols;
   const rows = term.rows;
 
+  // If a filepath is given, try to open it; fall through to easter egg on failure
+  if (filepath) {
+    const content = fileSystem.readFile(filepath);
+    if (content !== null) {
+      startVimEditor(ctx, filepath, content);
+      return;
+    }
+    // File not found — check if it's a directory
+    const node = fileSystem.getNodeAtPath(filepath);
+    if (node && node.type === 'directory') {
+      // vim on a directory — show error inline, don't enter fullscreen
+      term.writeln(`\r\n${ANSI.red}"${filepath}" is a directory${ANSI.reset}`);
+      resetInput();
+      writePrompt();
+      return;
+    }
+    // Non-existent file — open empty buffer with the filename
+    startVimEditor(ctx, filepath, '');
+    return;
+  }
+
+  // ── No file: classic vim escape room ──
   const drawScreen = (statusText: string) => {
     term.write('\x1b[2J\x1b[H');
     for (let r = 0; r < rows - 1; r++) {
@@ -122,6 +147,414 @@ export function startVim(ctx: TerminalContext): void {
       cmdBuf += data;
       drawScreen(cmdBuf);
     }
+  });
+}
+
+/**
+ * Full vim-style file editor — buffer navigation, insert mode, command-line
+ */
+function startVimEditor(ctx: TerminalContext, filepath: string, content: string): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+  const cols = term.cols;
+  const rows = term.rows;
+  const textRows = rows - 2; // content area (last 2 rows = status + command)
+
+  // Buffer state
+  const lines = content ? content.split('\n') : [''];
+  let cursorRow = 0;   // cursor line in buffer
+  let cursorCol = 0;   // cursor column in buffer
+  let scrollTop = 0;   // first visible line
+  let mode: 'NORMAL' | 'INSERT' | 'COMMAND' = 'NORMAL';
+  let cmdBuf = '';
+  let statusMsg = '';
+  let normalBuf = '';  // for multi-key commands like gg
+
+  const clampCursor = () => {
+    cursorRow = Math.max(0, Math.min(cursorRow, lines.length - 1));
+    const lineLen = lines[cursorRow].length;
+    if (mode === 'INSERT') {
+      cursorCol = Math.max(0, Math.min(cursorCol, lineLen));
+    } else {
+      cursorCol = Math.max(0, Math.min(cursorCol, Math.max(0, lineLen - 1)));
+    }
+  };
+
+  const ensureVisible = () => {
+    if (cursorRow < scrollTop) scrollTop = cursorRow;
+    if (cursorRow >= scrollTop + textRows) scrollTop = cursorRow - textRows + 1;
+  };
+
+  const drawScreen = () => {
+    term.write('\x1b[2J\x1b[H');
+
+    // Render text area
+    for (let r = 0; r < textRows; r++) {
+      const lineIdx = scrollTop + r;
+      if (lineIdx < lines.length) {
+        // Line number gutter (4 chars wide)
+        const lineNum = String(lineIdx + 1).padStart(3);
+        const lineContent = lines[lineIdx];
+        // Truncate to fit after gutter
+        const maxWidth = cols - 5;
+        const display = lineContent.length > maxWidth
+          ? lineContent.slice(0, maxWidth)
+          : lineContent;
+        term.write(`${ANSI.dim}${lineNum} ${ANSI.reset}${display}\r\n`);
+      } else {
+        // Past end of file — show tilde
+        term.write(`${ANSI.blue}~${ANSI.reset}\r\n`);
+      }
+    }
+
+    // Status bar (inverted)
+    const modeLabel = mode === 'INSERT' ? ' -- INSERT -- ' : '';
+    const fileInfo = ` ${filepath}`;
+    const position = `${cursorRow + 1},${cursorCol + 1}`;
+    const lineCount = `${lines.length}L`;
+    const rightSide = `${position}   ${lineCount} `;
+    const midPad = Math.max(0, cols - visibleLength(modeLabel) - visibleLength(fileInfo) - rightSide.length);
+    term.write(`\x1b[7m${modeLabel}${fileInfo}${' '.repeat(midPad)}${rightSide}\x1b[27m\r\n`);
+
+    // Command/message line
+    if (mode === 'COMMAND') {
+      term.write(cmdBuf);
+    } else if (statusMsg) {
+      term.write(statusMsg);
+    }
+
+    // Position hardware cursor on the buffer cursor location
+    const screenRow = cursorRow - scrollTop + 1; // 1-based row
+    const screenCol = cursorCol + 5;              // 4-char gutter + 1 space + 1-based
+    term.write(`\x1b[${screenRow};${screenCol}H`);
+  };
+
+  const exitEditor = () => {
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H');
+    resetInput();
+    writePrompt();
+  };
+
+  drawScreen();
+
+  setInteractiveMode((data: string) => {
+    const code = data.charCodeAt(0);
+    statusMsg = '';
+
+    // ── COMMAND mode (:) ──
+    if (mode === 'COMMAND') {
+      if (code === 27) {
+        // Escape → back to NORMAL
+        mode = 'NORMAL';
+        cmdBuf = '';
+      } else if (code === 13) {
+        // Enter → execute command
+        const cmd = cmdBuf;
+        mode = 'NORMAL';
+        cmdBuf = '';
+        if (cmd === ':q' || cmd === ':q!') {
+          exitEditor();
+          return;
+        } else if (cmd === ':w') {
+          statusMsg = `${ANSI.yellow}Changes not saved — portfolio preview${ANSI.reset}`;
+        } else if (cmd === ':wq' || cmd === ':wq!' || cmd === ':x') {
+          statusMsg = `${ANSI.yellow}Changes not saved — portfolio preview${ANSI.reset}`;
+          // Brief flash of message then exit
+          drawScreen();
+          setTimeout(() => exitEditor(), 800);
+          return;
+        } else {
+          const errCmd = cmd.slice(1);
+          statusMsg = `${ANSI.red}E492: Not an editor command: ${errCmd}${ANSI.reset}`;
+        }
+      } else if (code === 127) {
+        // Backspace
+        if (cmdBuf.length > 1) {
+          cmdBuf = cmdBuf.slice(0, -1);
+        } else {
+          mode = 'NORMAL';
+          cmdBuf = '';
+        }
+      } else if (code >= 32 && code < 127) {
+        cmdBuf += data;
+      }
+      drawScreen();
+      return;
+    }
+
+    // ── INSERT mode ──
+    if (mode === 'INSERT') {
+      if (code === 27) {
+        // Escape → NORMAL
+        mode = 'NORMAL';
+        clampCursor();
+        drawScreen();
+        return;
+      }
+      if (code === 3) {
+        // Ctrl+C → NORMAL
+        mode = 'NORMAL';
+        clampCursor();
+        drawScreen();
+        return;
+      }
+
+      // Typing in insert mode — modify buffer
+      if (code === 13) {
+        // Enter — split line
+        const line = lines[cursorRow];
+        const before = line.slice(0, cursorCol);
+        const after = line.slice(cursorCol);
+        lines[cursorRow] = before;
+        lines.splice(cursorRow + 1, 0, after);
+        cursorRow++;
+        cursorCol = 0;
+      } else if (code === 127) {
+        // Backspace
+        if (cursorCol > 0) {
+          const line = lines[cursorRow];
+          lines[cursorRow] = line.slice(0, cursorCol - 1) + line.slice(cursorCol);
+          cursorCol--;
+        } else if (cursorRow > 0) {
+          // Join with previous line
+          cursorCol = lines[cursorRow - 1].length;
+          lines[cursorRow - 1] += lines[cursorRow];
+          lines.splice(cursorRow, 1);
+          cursorRow--;
+        }
+      } else if (data === '\x1b[A') {
+        // Arrow up
+        if (cursorRow > 0) cursorRow--;
+        clampCursor();
+      } else if (data === '\x1b[B') {
+        // Arrow down
+        if (cursorRow < lines.length - 1) cursorRow++;
+        clampCursor();
+      } else if (data === '\x1b[C') {
+        // Arrow right
+        if (cursorCol < lines[cursorRow].length) cursorCol++;
+      } else if (data === '\x1b[D') {
+        // Arrow left
+        if (cursorCol > 0) cursorCol--;
+      } else if (code >= 32 && code < 127) {
+        // Printable character
+        const line = lines[cursorRow];
+        lines[cursorRow] = line.slice(0, cursorCol) + data + line.slice(cursorCol);
+        cursorCol++;
+      }
+
+      ensureVisible();
+      drawScreen();
+      return;
+    }
+
+    // ── NORMAL mode ──
+    // Handle escape sequences first (arrow keys)
+    if (data === '\x1b[A') { // Up
+      if (cursorRow > 0) cursorRow--;
+      clampCursor();
+      ensureVisible();
+      normalBuf = '';
+      drawScreen();
+      return;
+    }
+    if (data === '\x1b[B') { // Down
+      if (cursorRow < lines.length - 1) cursorRow++;
+      clampCursor();
+      ensureVisible();
+      normalBuf = '';
+      drawScreen();
+      return;
+    }
+    if (data === '\x1b[C') { // Right
+      const lineLen = lines[cursorRow].length;
+      if (cursorCol < Math.max(0, lineLen - 1)) cursorCol++;
+      normalBuf = '';
+      drawScreen();
+      return;
+    }
+    if (data === '\x1b[D') { // Left
+      if (cursorCol > 0) cursorCol--;
+      normalBuf = '';
+      drawScreen();
+      return;
+    }
+
+    // Ctrl+C
+    if (code === 3) {
+      normalBuf = '';
+      drawScreen();
+      return;
+    }
+
+    // Single-key normal commands
+    switch (data) {
+      case 'h':
+        if (cursorCol > 0) cursorCol--;
+        normalBuf = '';
+        break;
+      case 'j':
+        if (cursorRow < lines.length - 1) cursorRow++;
+        clampCursor();
+        ensureVisible();
+        normalBuf = '';
+        break;
+      case 'k':
+        if (cursorRow > 0) cursorRow--;
+        clampCursor();
+        ensureVisible();
+        normalBuf = '';
+        break;
+      case 'l': {
+        const lineLen = lines[cursorRow].length;
+        if (cursorCol < Math.max(0, lineLen - 1)) cursorCol++;
+        normalBuf = '';
+        break;
+      }
+      case 'w': {
+        // Word forward
+        const line = lines[cursorRow];
+        const rest = line.slice(cursorCol + 1);
+        const match = rest.match(/\S+/);
+        if (match && match.index !== undefined) {
+          cursorCol += match.index + 1;
+        } else if (cursorRow < lines.length - 1) {
+          cursorRow++;
+          cursorCol = 0;
+          // Skip to first non-space
+          const nextLine = lines[cursorRow];
+          const ws = nextLine.match(/^\s*/);
+          if (ws && ws[0].length < nextLine.length) {
+            cursorCol = ws[0].length;
+          }
+        }
+        clampCursor();
+        ensureVisible();
+        normalBuf = '';
+        break;
+      }
+      case 'b': {
+        // Word backward
+        if (cursorCol > 0) {
+          const line = lines[cursorRow];
+          const before = line.slice(0, cursorCol);
+          const match = before.match(/\S+\s*$/);
+          if (match && match.index !== undefined) {
+            cursorCol = match.index;
+          } else {
+            cursorCol = 0;
+          }
+        } else if (cursorRow > 0) {
+          cursorRow--;
+          cursorCol = Math.max(0, lines[cursorRow].length - 1);
+        }
+        clampCursor();
+        ensureVisible();
+        normalBuf = '';
+        break;
+      }
+      case '0':
+        cursorCol = 0;
+        normalBuf = '';
+        break;
+      case '$':
+        cursorCol = Math.max(0, lines[cursorRow].length - 1);
+        normalBuf = '';
+        break;
+      case 'G':
+        // Go to last line
+        cursorRow = lines.length - 1;
+        cursorCol = 0;
+        clampCursor();
+        ensureVisible();
+        normalBuf = '';
+        break;
+      case 'g':
+        if (normalBuf === 'g') {
+          // gg — go to first line
+          cursorRow = 0;
+          cursorCol = 0;
+          scrollTop = 0;
+          normalBuf = '';
+        } else {
+          normalBuf = 'g';
+          drawScreen();
+          return;
+        }
+        break;
+      case 'i':
+        // Insert before cursor
+        mode = 'INSERT';
+        normalBuf = '';
+        break;
+      case 'a':
+        // Insert after cursor
+        mode = 'INSERT';
+        cursorCol = Math.min(cursorCol + 1, lines[cursorRow].length);
+        normalBuf = '';
+        break;
+      case 'o':
+        // Open new line below
+        mode = 'INSERT';
+        lines.splice(cursorRow + 1, 0, '');
+        cursorRow++;
+        cursorCol = 0;
+        ensureVisible();
+        normalBuf = '';
+        break;
+      case 'O':
+        // Open new line above
+        mode = 'INSERT';
+        lines.splice(cursorRow, 0, '');
+        cursorCol = 0;
+        ensureVisible();
+        normalBuf = '';
+        break;
+      case 'A':
+        // Append at end of line
+        mode = 'INSERT';
+        cursorCol = lines[cursorRow].length;
+        normalBuf = '';
+        break;
+      case 'I':
+        // Insert at beginning of line (first non-whitespace)
+        mode = 'INSERT';
+        const ws = lines[cursorRow].match(/^\s*/);
+        cursorCol = ws ? ws[0].length : 0;
+        normalBuf = '';
+        break;
+      case ':':
+        mode = 'COMMAND';
+        cmdBuf = ':';
+        normalBuf = '';
+        break;
+      case 'Z':
+        if (normalBuf === 'Z') {
+          exitEditor();
+          return;
+        }
+        normalBuf = 'Z';
+        drawScreen();
+        return;
+      // Half-page scroll
+      case '\x15': // Ctrl+U
+        cursorRow = Math.max(0, cursorRow - Math.floor(textRows / 2));
+        clampCursor();
+        ensureVisible();
+        normalBuf = '';
+        break;
+      case '\x04': // Ctrl+D
+        cursorRow = Math.min(lines.length - 1, cursorRow + Math.floor(textRows / 2));
+        clampCursor();
+        ensureVisible();
+        normalBuf = '';
+        break;
+      default:
+        normalBuf = '';
+        break;
+    }
+
+    drawScreen();
   });
 }
 
