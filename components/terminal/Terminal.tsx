@@ -7,8 +7,8 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { themes, themeNames, ColorMode } from '@/lib/theme/themes';
 import {
-  generatePrompt,
-  generateShortPrompt,
+  generatePromptInfo,
+  generatePromptSymbol,
   helpCommand,
   lsCommand,
   cdCommand,
@@ -77,18 +77,18 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const aliasesRef = useRef<Record<string, string>>({});
   const jobsRef = useRef<Job[]>([]);
   const nextJobIdRef = useRef(1);
+  const promptMultilineRef = useRef(false);
 
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
-      const prompt = generatePrompt();
-      xtermRef.current.write('\r\n' + prompt);
+      xtermRef.current.write('\r\n' + generatePromptInfo() + '\r\n' + generatePromptSymbol());
+      promptMultilineRef.current = true;
     }
   }, []);
 
   const writeShortPrompt = useCallback(() => {
     if (xtermRef.current) {
-      const prompt = generateShortPrompt();
-      xtermRef.current.write(prompt);
+      xtermRef.current.write(generatePromptSymbol());
     }
   }, []);
 
@@ -600,8 +600,8 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         term.writeln(` Type ${ANSI.green}help${ANSI.reset} for commands`);
       }
 
-      term.writeln('');
-      writeShortPrompt();
+      term.write(generatePromptInfo() + '\r\n' + generatePromptSymbol());
+      promptMultilineRef.current = true;
     };
 
     // Fit terminal using FitAddon (which properly measures char dimensions)
@@ -686,7 +686,13 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
             const prevCommand = commandHistoryRef.current[historyIndexRef.current];
             inputBufferRef.current = prevCommand;
             cursorPositionRef.current = prevCommand.length;
-            term.write('\r\x1b[K');
+            if (promptMultilineRef.current) {
+              // Clear both info line and prompt line
+              term.write('\x1b[A\r\x1b[J');
+              promptMultilineRef.current = false;
+            } else {
+              term.write('\r\x1b[K');
+            }
             writeShortPrompt();
             term.write(prevCommand);
           }
@@ -739,6 +745,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         cursorPositionRef.current = 0;
         writePrompt();
       } else if (code >= 32 && code < 127) {
+        promptMultilineRef.current = false;
         const before = inputBufferRef.current.slice(0, cursorPositionRef.current);
         const after = inputBufferRef.current.slice(cursorPositionRef.current);
         inputBufferRef.current = before + data + after;

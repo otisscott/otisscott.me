@@ -19,20 +19,17 @@ export function getExitCode(): number {
   return lastExitCode;
 }
 
-// Generate Pure-style prompt
-export function generatePrompt(): string {
-  const currentPath = fileSystem.getCurrentPath();
-  const gitBranch = 'main'; // Simulated git branch
-  const errorIndicator = lastExitCode !== 0 ? `${PromptColors.error}✘ ${PromptColors.reset}` : '';
-
-  return `${errorIndicator}${PromptColors.directory}${currentPath}${PromptColors.reset} ${PromptColors.gitBranch}on ${gitBranch}${PromptColors.reset} ${PromptColors.nodeVersion}via ⬢ ${NODE_VERSION}${PromptColors.reset} \r\n${PromptColors.promptSymbol}❯${PromptColors.reset} `;
-}
-
-// Generate short prompt (for initial display)
-export function generateShortPrompt(): string {
+// Prompt info line (path, branch, node version)
+export function generatePromptInfo(): string {
   const currentPath = fileSystem.getCurrentPath();
   const gitBranch = 'main';
-  return `${PromptColors.directory}${currentPath}${PromptColors.reset} ${PromptColors.gitBranch}on ${gitBranch}${PromptColors.reset} ${PromptColors.nodeVersion}via ⬢ ${NODE_VERSION}${PromptColors.reset} ${PromptColors.promptSymbol}❯${PromptColors.reset} `;
+  const errorIndicator = lastExitCode !== 0 ? `${PromptColors.error}✘ ${PromptColors.reset}` : '';
+  return `${errorIndicator}${PromptColors.directory}${currentPath}${PromptColors.reset} ${PromptColors.gitBranch}on ${gitBranch}${PromptColors.reset} ${PromptColors.nodeVersion}via ⬢ ${NODE_VERSION}${PromptColors.reset}`;
+}
+
+// Prompt input line (❯ cursor)
+export function generatePromptSymbol(): string {
+  return `${PromptColors.promptSymbol}❯${PromptColors.reset} `;
 }
 
 // ── Command Registry ─────────────────────────────────────────────────
