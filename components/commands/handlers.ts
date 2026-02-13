@@ -460,7 +460,7 @@ ${ANSI.dim}hint: try 'git log' or 'git blame about/bio.md'${ANSI.reset}`;
 }
 
 // Neofetch command — OS-specific ASCII art from neofetch source
-export function neofetchCommand(loadTime: number): string {
+export function neofetchCommand(loadTime: number, cols: number): string {
   const now = Date.now();
   const uptimeMs = now - loadTime;
   const uptimeSec = Math.floor(uptimeMs / 1000);
@@ -473,7 +473,9 @@ export function neofetchCommand(loadTime: number): string {
     : `${uptimeSec}s`;
 
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown';
-  const os = userAgent.includes('Mac') ? 'macOS' :
+  // Android UA contains "Linux", so check it first
+  const os = userAgent.includes('Android') ? 'Android' :
+             userAgent.includes('Mac') ? 'macOS' :
              userAgent.includes('Win') ? 'Windows' :
              userAgent.includes('Linux') ? 'Linux' : 'Unknown OS';
 
@@ -486,8 +488,10 @@ export function neofetchCommand(loadTime: number): string {
   const w = ANSI.white;
   const R = ANSI.reset;
 
-  // OS-specific ASCII art (adapted from neofetch)
-  const logos: Record<string, string[]> = {
+  const compact = cols < 60;
+
+  // Full-size logos for wide terminals (adapted from neofetch)
+  const fullLogos: Record<string, string[]> = {
     macOS: [
       `${g}                 c.'`,
       `${g}              ,xNMM.`,
@@ -538,10 +542,61 @@ export function neofetchCommand(loadTime: number): string {
       `${y}#######${w}#${R}#####${w}#${y}#######`,
       `${y}  #####${w}#######${y}#####`,
     ],
+    Android: [
+      `${g}         -o          o-`,
+      `${g}          +hydNNNNdyh+`,
+      `${g}        +mMMMMMMMMMMMMm+`,
+      `${g}      \`dMM.----------.MMb\``,
+      `${g}      hMMMMMMMMMMMMMMMMMMh`,
+      `${g}      .MMMMMMMMMMMMMMMMMM.`,
+      `${g}      :MMMMMMMMMMMMMMMMMM:`,
+      `${g}      .MMMMMMMMMMMMMMMMMM.`,
+      `${g}      hMMMMMMMMMMMMMMMNsh+`,
+      `${g}      \`dMMMMMMMd/--------\``,
+      `${g}        +mMMMMMMy--------h`,
+      `${g}            +hddMMMMN+----+`,
+    ],
   };
 
-  const logo = logos[os] || logos['Linux'];
-  const logoWidth = 30; // fixed gutter for alignment
+  // Compact logos for narrow terminals (~12-16 chars visible)
+  const smallLogos: Record<string, string[]> = {
+    macOS: [
+      `${g}       .:'`,
+      `${g}     .:' ':.`,
+      `${y}    /:.'  '.:\\`,
+      `${r}   |:.'    ':.| `,
+      `${m}    \\':....:'/ `,
+      `${b}     ':..:' `,
+      `${c}       ':'`,
+    ],
+    Windows: [
+      `${c} ####  ####`,
+      `${c} ####  ####`,
+      `${c}`,
+      `${c} ####  ####`,
+      `${c} ####  ####`,
+    ],
+    Linux: [
+      `${w}    .--. `,
+      `${w}   |${R}o  o${w}|`,
+      `${w}   |${y}.__.${w}|`,
+      `${w}  / ${R}''''${w} \\`,
+      `${y} |  |  |  |`,
+      `${y}  \\|__|/`,
+    ],
+    Android: [
+      `${g}  \\  / `,
+      `${g} .-''-. `,
+      `${g}/ ${w}o  o${g} \\`,
+      `${g}|------|`,
+      `${g}|      |`,
+      `${g} \\____/ `,
+    ],
+  };
+
+  const logo = compact
+    ? (smallLogos[os] || smallLogos['Linux'])
+    : (fullLogos[os] || fullLogos['Linux']);
 
   const info = [
     `${w}${ANSI.bold}otis${R}${w}@${ANSI.bold}otisscott.me${R}`,
@@ -556,7 +611,13 @@ export function neofetchCommand(loadTime: number): string {
     `${r}███${R}${g}███${R}${y}███${R}${b}███${R}${m}███${R}${c}███${R}${w}███${R}`,
   ];
 
-  // Merge logo and info side by side
+  if (compact) {
+    // Stacked layout: logo centered above info
+    return [...logo, '', ...info].join('\n');
+  }
+
+  // Side-by-side for wide terminals
+  const logoWidth = 30;
   const maxLines = Math.max(logo.length, info.length);
   const lines: string[] = [];
   for (let i = 0; i < maxLines; i++) {

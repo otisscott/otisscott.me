@@ -332,7 +332,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           writeOutput(glCommand());
           break;
         case 'neofetch':
-          writeOutput(neofetchCommand(loadTimeRef.current));
+          writeOutput(neofetchCommand(loadTimeRef.current, xtermRef.current?.cols ?? 80));
           break;
         case 'cowsay':
           writeOutput(cowsayCommand(args));
