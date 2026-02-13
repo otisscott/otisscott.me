@@ -462,7 +462,7 @@ ${ANSI.dim}hint: try 'git log' or 'git blame about/bio.md'${ANSI.reset}`;
   }
 }
 
-// Neofetch command
+// Neofetch command — OS-specific ASCII art from neofetch source
 export function neofetchCommand(): string {
   const loadTime = new Date();
   const now = new Date();
@@ -481,21 +481,95 @@ export function neofetchCommand(): string {
              userAgent.includes('Win') ? 'Windows' :
              userAgent.includes('Linux') ? 'Linux' : 'Unknown OS';
 
-  const W = 49; // inner width between │ borders
-  const row = (content: string) =>
-    `${ANSI.cyan}│${ANSI.reset}${padEndVisible(content, W)}${ANSI.cyan}│${ANSI.reset}`;
+  const g = ANSI.green;
+  const c = ANSI.cyan;
+  const y = ANSI.yellow;
+  const r = ANSI.red;
+  const b = ANSI.blue;
+  const m = ANSI.magenta;
+  const w = ANSI.white;
+  const R = ANSI.reset;
 
-  return [
-    `${ANSI.cyan}╭────────────── ${ANSI.white}otismscott@gmail.com${ANSI.cyan} ──────────────╮${ANSI.reset}`,
-    row(''),
-    row(`   ${ANSI.blue}╭─────╮${ANSI.reset}  ${ANSI.bold}OS:${ANSI.reset} ${os} / Web Browser`),
-    row(`   ${ANSI.blue}│${ANSI.reset}     ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Shell:${ANSI.reset} xterm.js`),
-    row(`   ${ANSI.blue}│${ANSI.reset}  ${ANSI.white}O${ANSI.reset}  ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Terminal:${ANSI.reset} otisscott.me`),
-    row(`   ${ANSI.blue}│${ANSI.reset}     ${ANSI.blue}│${ANSI.reset}  ${ANSI.bold}Theme:${ANSI.reset} Tokyo Night`),
-    row(`   ${ANSI.blue}╰─────╯${ANSI.reset}  ${ANSI.bold}Uptime:${ANSI.reset} ${uptimeStr}`),
-    row(''),
-    `${ANSI.cyan}╰${'─'.repeat(W)}╯${ANSI.reset}`,
-  ].join('\n');
+  // OS-specific ASCII art (adapted from neofetch)
+  const logos: Record<string, string[]> = {
+    macOS: [
+      `${g}                 c.'`,
+      `${g}              ,xNMM.`,
+      `${g}            .OMMMMO`,
+      `${g}            lMM"`,
+      `${g}  .;loddo:.  .olloddol;.`,
+      `${g}cKMMMMMMMMMMNWMMMMMMMMM0:`,
+      `${y}.KMMMMMMMMMMMMMMMMMMMMMMW.`,
+      `${y}XMMMMMMMMMMMMMMMMMMMMMMMX.`,
+      `${r};MMMMMMMMMMMMMMMMMMMMMMMM:`,
+      `${r}:MMMMMMMMMMMMMMMMMMMMMMMM:`,
+      `${m}.MMMMMMMMMMMMMMMMMMMMMMMMX.`,
+      `${m} kMMMMMMMMMMMMMMMMMMMMMMMMW`,
+      `${b} 'XMMMMMMMMMMMMMMMMMMMMMMM`,
+      `${b}   kMMMMMMMMMMMMMMMMMMMMd`,
+      `${c}    ;KMMMMMMMWXXWMMMMMk.`,
+      `${c}      "cooc*"    "*coo"`,
+    ],
+    Windows: [
+      `${c}                         ..,`,
+      `${c}             ....,,:;+ccllll`,
+      `${c}  ...,,+:;  cllllllllllllll`,
+      `${c},ccllllllll  llllllllllllll`,
+      `${c}llllllllllll  lllllllllllll`,
+      `${c}llllllllllll  lllllllllllll`,
+      `${c}llllllllllll  lllllllllllll`,
+      `${c}llllllllllll  lllllllllllll`,
+      `${c}`,
+      `${c}llllllllllll  lllllllllllll`,
+      `${c}llllllllllll  lllllllllllll`,
+      `${c}llllllllllll  lllllllllllll`,
+      `${c}llllllllllll  lllllllllllll`,
+      `${c}\`'ccllllllll  lllllllllllll`,
+      `${c}      \`'*::  :ccllllllllll`,
+      `${c}                   \`\`'*::c`,
+    ],
+    Linux: [
+      `${w}        #####`,
+      `${w}       #######`,
+      `${w}       ##${R}O${w}#${R}O${w}##`,
+      `${w}       #${y}#####${w}#`,
+      `${w}     ##${R}##${y}###${R}##${w}##`,
+      `${w}    #${R}##########${w}##`,
+      `${w}   #${R}############${w}##`,
+      `${w}   #${R}############${w}###`,
+      `${y}  ##${w}#${R}###########${w}##${y}#`,
+      `${y}######${w}#${R}#######${w}#${y}######`,
+      `${y}#######${w}#${R}#####${w}#${y}#######`,
+      `${y}  #####${w}#######${y}#####`,
+    ],
+  };
+
+  const logo = logos[os] || logos['Linux'];
+  const logoWidth = 30; // fixed gutter for alignment
+
+  const info = [
+    `${w}${ANSI.bold}otis${R}${w}@${ANSI.bold}otisscott.me${R}`,
+    `${ANSI.dim}${'─'.repeat(22)}${R}`,
+    `${w}${ANSI.bold}OS${R}: ${os} / Web Browser`,
+    `${w}${ANSI.bold}Shell${R}: xterm.js`,
+    `${w}${ANSI.bold}Terminal${R}: otisscott.me`,
+    `${w}${ANSI.bold}Theme${R}: Tokyo Night`,
+    `${w}${ANSI.bold}Uptime${R}: ${uptimeStr}`,
+    `${w}${ANSI.bold}Editor${R}: Neovim`,
+    '',
+    `${r}███${R}${g}███${R}${y}███${R}${b}███${R}${m}███${R}${c}███${R}${w}███${R}`,
+  ];
+
+  // Merge logo and info side by side
+  const maxLines = Math.max(logo.length, info.length);
+  const lines: string[] = [];
+  for (let i = 0; i < maxLines; i++) {
+    const artLine = i < logo.length ? logo[i] : '';
+    const infoLine = i < info.length ? info[i] : '';
+    lines.push(`${padEndVisible(artLine, logoWidth)}${R}  ${infoLine}`);
+  }
+
+  return lines.join('\n');
 }
 
 // Cowsay command
