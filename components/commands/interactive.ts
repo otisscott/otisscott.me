@@ -185,7 +185,8 @@ function startVimEditor(ctx: TerminalContext, filepath: string, content: string)
   };
 
   const drawScreen = () => {
-    term.write('\x1b[2J\x1b[H');
+    let buf = '\x1b[?25l'; // Hide cursor during redraw
+    buf += '\x1b[2J\x1b[H';
 
     // Render text area
     for (let r = 0; r < textRows; r++) {
@@ -199,10 +200,10 @@ function startVimEditor(ctx: TerminalContext, filepath: string, content: string)
         const display = lineContent.length > maxWidth
           ? lineContent.slice(0, maxWidth)
           : lineContent;
-        term.write(`${ANSI.dim}${lineNum} ${ANSI.reset}${display}\r\n`);
+        buf += `${ANSI.dim}${lineNum} ${ANSI.reset}${display}\r\n`;
       } else {
         // Past end of file — show tilde
-        term.write(`${ANSI.blue}~${ANSI.reset}\r\n`);
+        buf += `${ANSI.blue}~${ANSI.reset}\r\n`;
       }
     }
 
@@ -213,19 +214,22 @@ function startVimEditor(ctx: TerminalContext, filepath: string, content: string)
     const lineCount = `${lines.length}L`;
     const rightSide = `${position}   ${lineCount} `;
     const midPad = Math.max(0, cols - visibleLength(modeLabel) - visibleLength(fileInfo) - rightSide.length);
-    term.write(`\x1b[7m${modeLabel}${fileInfo}${' '.repeat(midPad)}${rightSide}\x1b[27m\r\n`);
+    buf += `\x1b[7m${modeLabel}${fileInfo}${' '.repeat(midPad)}${rightSide}\x1b[27m\r\n`;
 
     // Command/message line
     if (mode === 'COMMAND') {
-      term.write(cmdBuf);
+      buf += cmdBuf;
     } else if (statusMsg) {
-      term.write(statusMsg);
+      buf += statusMsg;
     }
 
     // Position hardware cursor on the buffer cursor location
     const screenRow = cursorRow - scrollTop + 1; // 1-based row
     const screenCol = cursorCol + 5;              // 4-char gutter + 1 space + 1-based
-    term.write(`\x1b[${screenRow};${screenCol}H`);
+    buf += `\x1b[${screenRow};${screenCol}H`;
+    buf += '\x1b[?25h'; // Show cursor
+
+    term.write(buf);
   };
 
   const exitEditor = () => {
