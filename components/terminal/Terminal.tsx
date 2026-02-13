@@ -50,7 +50,7 @@ import {
   setExitCode,
 } from '@/components/commands/handlers';
 import type { Job } from '@/components/commands/handlers';
-import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode, startSsh, startHtop, startMake, startScp, startBgJob } from '@/components/commands/interactive';
+import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode, startTraceroute, startSsh, startHtop, startMake, startScp, startBgJob } from '@/components/commands/interactive';
 import { ANSI, padEndVisible } from '@/lib/filesystem/types';
 
 interface TerminalProps {
@@ -439,6 +439,12 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           break;
         case 'docker':
           writeOutput(dockerCommand(args, loadTimeRef.current));
+          break;
+        case 'traceroute':
+          if (xtermRef.current) {
+            startTraceroute(getTerminalContext());
+            return;
+          }
           break;
         case 'ssh':
           if (xtermRef.current) {

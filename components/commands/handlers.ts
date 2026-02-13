@@ -35,46 +35,102 @@ export function generateShortPrompt(): string {
   return `${PromptColors.directory}${currentPath}${PromptColors.reset} ${PromptColors.gitBranch}on ${gitBranch}${PromptColors.reset} ${PromptColors.nodeVersion}via ⬢ ${NODE_VERSION}${PromptColors.reset} ${PromptColors.promptSymbol}❯${PromptColors.reset} `;
 }
 
-// Help command
+// ── Command Registry ─────────────────────────────────────────────────
+// Single source of truth. Adding a command here wires up help, tab
+// completion, and alias resolution automatically.  Hidden commands
+// (aliases like gs/gl, easter eggs like sl) omit description so they
+// don't clutter help but still complete and resolve.
+
+interface CommandEntry {
+  category: 'Navigation' | 'Portfolio' | 'Tools' | 'hidden';
+  description?: string;  // omit to hide from help
+}
+
+const COMMAND_REGISTRY: Record<string, CommandEntry> = {
+  // Navigation
+  ls:          { category: 'Navigation', description: 'List directory contents' },
+  cd:          { category: 'Navigation', description: 'Change directory' },
+  pwd:         { category: 'Navigation', description: 'Print working directory' },
+  cat:         { category: 'Navigation', description: 'Display file contents' },
+  tree:        { category: 'Navigation', description: 'Show directory tree' },
+  grep:        { category: 'Navigation', description: 'Search file contents' },
+  open:        { category: 'Navigation', description: 'Open URL from file' },
+
+  // Portfolio
+  whoami:      { category: 'Portfolio', description: 'Display user information' },
+  skills:      { category: 'Portfolio', description: 'Display technical skills' },
+  experience:  { category: 'Portfolio', description: 'List work history' },
+  contact:     { category: 'Portfolio', description: 'Display contact information' },
+  projects:    { category: 'Portfolio', description: 'List all projects' },
+
+  // Tools
+  help:        { category: 'Tools', description: 'Show this help message' },
+  clear:       { category: 'Tools', description: 'Clear the terminal' },
+  echo:        { category: 'Tools', description: 'Print text to the terminal' },
+  date:        { category: 'Tools', description: 'Show current date and time' },
+  history:     { category: 'Tools', description: 'Show command history' },
+  ping:        { category: 'Tools', description: 'Ping a host' },
+  theme:       { category: 'Tools', description: 'Change color theme' },
+  git:         { category: 'Tools', description: 'Git commands (log, blame, status...)' },
+  traceroute:  { category: 'Tools', description: 'Trace the route to otisscott.me' },
+  neofetch:    { category: 'Tools', description: 'Display system info' },
+  cowsay:      { category: 'Tools', description: 'ASCII cow says a message' },
+  man:         { category: 'Tools', description: 'Display manual pages' },
+  cal:         { category: 'Tools', description: 'Show calendar' },
+  scp:         { category: 'Tools', description: 'Secure file copy' },
+  todo:        { category: 'Tools', description: 'Personal todo list' },
+  alias:       { category: 'Tools', description: 'Define command aliases' },
+  jobs:        { category: 'Tools', description: 'List background jobs' },
+
+  // Hidden — completable but not in help
+  gs:          { category: 'hidden' },
+  gl:          { category: 'hidden' },
+  vim:         { category: 'hidden' },
+  vi:          { category: 'hidden' },
+  nano:        { category: 'hidden' },
+  sudo:        { category: 'hidden' },
+  exit:        { category: 'hidden' },
+  quit:        { category: 'hidden' },
+  logout:      { category: 'hidden' },
+  sl:          { category: 'hidden' },
+  rm:          { category: 'hidden' },
+  docker:      { category: 'hidden' },
+  ssh:         { category: 'hidden' },
+  htop:        { category: 'hidden' },
+  top:         { category: 'hidden' },
+  uptime:      { category: 'hidden' },
+  make:        { category: 'hidden' },
+  npm:         { category: 'hidden' },
+  npx:         { category: 'hidden' },
+  bun:         { category: 'hidden' },
+  bunx:        { category: 'hidden' },
+  uv:          { category: 'hidden' },
+  claude:      { category: 'hidden' },
+  'claude-code': { category: 'hidden' },
+  codex:       { category: 'hidden' },
+  opencode:    { category: 'hidden' },
+  ncal:        { category: 'hidden' },
+  unalias:     { category: 'hidden' },
+  fg:          { category: 'hidden' },
+  bg:          { category: 'hidden' },
+};
+
+// Derived sets — no separate lists to maintain
+const BUILTIN_COMMANDS = new Set(Object.keys(COMMAND_REGISTRY));
+const COMPLETABLE_COMMANDS = Object.keys(COMMAND_REGISTRY);
+
+// Help command — generated from the registry
 export function helpCommand(): string {
-  return `${ANSI.bold}Available commands:${ANSI.reset}
+  const categories = ['Navigation', 'Portfolio', 'Tools'] as const;
+  const sections = categories.map(cat => {
+    const cmds = Object.entries(COMMAND_REGISTRY)
+      .filter(([, e]) => e.category === cat && e.description)
+      .map(([name, e]) => `  ${ANSI.green}${name.padEnd(12)}${ANSI.reset}- ${e.description}`)
+      .join('\n');
+    return `  ${ANSI.cyan}${cat}${ANSI.reset}\n${cmds}`;
+  });
 
-  ${ANSI.cyan}Navigation${ANSI.reset}
-  ${ANSI.green}ls${ANSI.reset}          - List directory contents
-  ${ANSI.green}cd${ANSI.reset}          - Change directory
-  ${ANSI.green}pwd${ANSI.reset}         - Print working directory
-  ${ANSI.green}cat${ANSI.reset}         - Display file contents
-  ${ANSI.green}tree${ANSI.reset}        - Show directory tree
-  ${ANSI.green}grep${ANSI.reset}        - Search file contents
-  ${ANSI.green}open${ANSI.reset}        - Open URL from file
-
-  ${ANSI.cyan}Portfolio${ANSI.reset}
-  ${ANSI.green}whoami${ANSI.reset}      - Display user information
-  ${ANSI.green}skills${ANSI.reset}      - Display technical skills
-  ${ANSI.green}experience${ANSI.reset}  - List work history
-  ${ANSI.green}contact${ANSI.reset}     - Display contact information
-  ${ANSI.green}projects${ANSI.reset}    - List all projects
-
-  ${ANSI.cyan}Tools${ANSI.reset}
-  ${ANSI.green}help${ANSI.reset}        - Show this help message
-  ${ANSI.green}clear${ANSI.reset}       - Clear the terminal
-  ${ANSI.green}echo${ANSI.reset}        - Print text to the terminal
-  ${ANSI.green}date${ANSI.reset}        - Show current date and time
-  ${ANSI.green}history${ANSI.reset}     - Show command history
-  ${ANSI.green}ping${ANSI.reset}        - Ping a host
-  ${ANSI.green}theme${ANSI.reset}       - Change color theme
-  ${ANSI.green}gs${ANSI.reset}          - Show git status
-  ${ANSI.green}gl${ANSI.reset}          - Show git log
-  ${ANSI.green}neofetch${ANSI.reset}    - Display system info
-  ${ANSI.green}cowsay${ANSI.reset}      - ASCII cow says a message
-  ${ANSI.green}man${ANSI.reset}         - Display manual pages
-  ${ANSI.green}cal${ANSI.reset}         - Show calendar
-  ${ANSI.green}scp${ANSI.reset}         - Secure file copy
-  ${ANSI.green}todo${ANSI.reset}        - Personal todo list
-  ${ANSI.green}alias${ANSI.reset}       - Define command aliases
-  ${ANSI.green}jobs${ANSI.reset}        - List background jobs
-
-${ANSI.dim}Tip: Use Tab for autocomplete, try ${ANSI.reset}${ANSI.green}sl${ANSI.reset}${ANSI.dim} for a surprise${ANSI.reset}`;
+  return `${ANSI.bold}Available commands:${ANSI.reset}\n\n${sections.join('\n\n')}\n\n${ANSI.dim}Tip: Use Tab for autocomplete, try ${ANSI.reset}${ANSI.green}sl${ANSI.reset}${ANSI.dim} for a surprise${ANSI.reset}`;
 }
 
 // LS command with flags
@@ -322,6 +378,52 @@ export function glCommand(): string {
   return output.join('\n\n');
 }
 
+// Git blame — annotate virtual files with fake commit metadata
+function gitBlameCommand(args: string[]): string {
+  const filepath = args[0];
+  if (!filepath) {
+    return `${ANSI.red}usage: git blame <file>${ANSI.reset}`;
+  }
+
+  const content = fileSystem.readFile(filepath);
+  if (content === null) {
+    return `${ANSI.red}fatal: no such path '${filepath}' in HEAD${ANSI.reset}`;
+  }
+
+  const lines = content.split('\n');
+
+  // Deterministic hash from string
+  const hash = (s: string, seed: number): string => {
+    let h = seed;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return Math.abs(h).toString(16).padStart(8, '0').slice(0, 8);
+  };
+
+  // Authors with commit date ranges — tells a story
+  const authors: { name: string; dateBase: number; weight: number }[] = [
+    { name: 'Otis Scott', dateBase: Date.parse('2025-11-15'), weight: 60 },
+    { name: 'Otis Scott', dateBase: Date.parse('2026-01-20'), weight: 25 },
+    { name: 'Claude',     dateBase: Date.parse('2026-02-10'), weight: 15 },
+  ];
+
+  const lineNumWidth = String(lines.length).length;
+
+  return lines.map((line, i) => {
+    const h = hash(line + filepath, i * 7919);
+    // Pick author deterministically from line index
+    const pick = (i * 31 + line.length) % 100;
+    const author = pick < authors[0].weight ? authors[0]
+      : pick < authors[0].weight + authors[1].weight ? authors[1]
+      : authors[2];
+    // Jitter the date by line index
+    const dateMs = author.dateBase + (i * 86400000 * 0.3);
+    const date = new Date(dateMs).toISOString().slice(0, 10);
+    const lineNum = String(i + 1).padStart(lineNumWidth);
+    const authorStr = author.name.padEnd(12);
+    return `${ANSI.yellow}${h}${ANSI.reset} ${ANSI.dim}(${authorStr} ${date} ${lineNum})${ANSI.reset} ${line}`;
+  }).join('\n');
+}
+
 // Git command with subcommands
 export function gitCommand(args: string[]): string {
   const sub = args[0];
@@ -331,10 +433,11 @@ export function gitCommand(args: string[]): string {
 ${ANSI.bold}available commands:${ANSI.reset}
   status    Show the working tree status
   log       Show commit logs
+  blame     Show what revision and author last modified each line
   branch    List branches
   remote    Show remotes
 
-${ANSI.dim}hint: try 'git log' or 'git status'${ANSI.reset}`;
+${ANSI.dim}hint: try 'git log' or 'git blame about/bio.md'${ANSI.reset}`;
   }
   switch (sub) {
     case 'status':
@@ -348,6 +451,8 @@ ${ANSI.dim}hint: try 'git log' or 'git status'${ANSI.reset}`;
         return `origin  https://github.com/otisscott/otisscott.me.git (fetch)\norigin  https://github.com/otisscott/otisscott.me.git (push)`;
       }
       return 'origin';
+    case 'blame':
+      return gitBlameCommand(args.slice(1));
     case 'push':
       return `${ANSI.red}error: permission denied${ANSI.reset}\n${ANSI.dim}hint: nice try ;)${ANSI.reset}`;
     case 'commit':
@@ -973,19 +1078,6 @@ export function unaliasCommand(args: string[]): string {
 }
 
 // Resolve aliases (single-pass, no recursion to avoid loops)
-const BUILTIN_COMMANDS = new Set([
-  'help', 'clear', 'date', 'echo', 'ls', 'cd', 'pwd', 'cat',
-  'tree', 'grep', 'open', 'whoami', 'skills', 'experience',
-  'contact', 'projects', 'history', 'ping', 'theme',
-  'gs', 'gl', 'git', 'neofetch', 'cowsay', 'sudo', 'vim', 'vi', 'nano',
-  'exit', 'quit', 'logout', 'sl', 'rm',
-  'docker', 'ssh', 'htop', 'top', 'uptime', 'make',
-  'npm', 'npx', 'bun', 'bunx', 'uv',
-  'claude', 'claude-code', 'codex', 'opencode',
-  'man', 'cal', 'ncal', 'scp', 'todo', 'alias', 'unalias',
-  'jobs', 'fg', 'bg',
-]);
-
 export function resolveAlias(command: string, aliases: Record<string, string>): string {
   const parts = command.split(' ');
   const cmd = parts[0];
@@ -1042,29 +1134,19 @@ export function bgCommand(): string {
   return `bg: no stopped jobs`;
 }
 
-// Tab completion
+// Tab completion — driven by COMMAND_REGISTRY + filesystem
 export function getCompletions(input: string): { completions: string[]; prefix: string } {
   const trimmed = input.trim();
   const parts = trimmed.split(' ');
 
-  // If we're completing a command
+  // Completing a command name
   if (parts.length === 1 && !trimmed.includes(' ')) {
-    const commands = [
-      'help', 'clear', 'date', 'echo', 'ls', 'cd', 'pwd', 'cat',
-      'tree', 'grep', 'open', 'whoami', 'skills', 'experience',
-      'contact', 'projects', 'history', 'ping', 'theme',
-      'gs', 'gl', 'neofetch', 'cowsay', 'sudo', 'vim', 'exit', 'sl', 'rm',
-      'docker', 'ssh', 'htop', 'uptime', 'make',
-      'man', 'cal', 'ncal', 'scp', 'todo', 'alias', 'unalias',
-      'jobs', 'fg', 'bg',
-    ];
-    const matches = commands.filter(cmd => cmd.startsWith(trimmed));
+    const matches = COMPLETABLE_COMMANDS.filter(cmd => cmd.startsWith(trimmed));
     return { completions: matches, prefix: '' };
   }
 
-  // If we're completing a path
+  // Completing a path argument
   if (parts.length >= 1) {
-    const cmd = parts[0];
     const pathArg = parts.slice(1).join(' ') || '';
     const completions = fileSystem.getCompletions(pathArg);
     return { completions, prefix: pathArg };

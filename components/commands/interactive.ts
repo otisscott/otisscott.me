@@ -1030,6 +1030,48 @@ export function startBgJob(
 // ─── Dev Tool Easter Eggs ────────────────────────────────────────────
 
 /**
+ * Traceroute animation — each hop is a chapter of the career journey.
+ * Latency tells a story: high during chaos, low when in flow.
+ */
+export function startTraceroute(ctx: TerminalContext): void {
+  const { term, resetInput, writePrompt } = ctx;
+
+  const jitter = (base: number, range: number) =>
+    (base + (Math.random() * range * 2 - range)).toFixed(3);
+
+  const hop = (n: number, host: string, ip: string, ms: number, range: number) =>
+    `${ANSI.dim}${String(n).padStart(2)}${ANSI.reset}  ${host} ${ANSI.dim}(${ip})${ANSI.reset}  ${jitter(ms, range)} ms  ${jitter(ms, range)} ms  ${jitter(ms, range)} ms`;
+
+  const hops: { text: string; delay: number }[] = [
+    { text: `traceroute to otisscott.me (76.76.21.21), 30 hops max, 60 byte packets`, delay: 300 },
+    { text: hop(1, 'localhost', '127.0.0.1', 0.04, 0.02), delay: 200 },
+    { text: hop(2, 'gateway.home.lan', '192.168.1.1', 1.2, 0.3), delay: 300 },
+    { text: hop(3, `${ANSI.magenta}courant.nyu.edu${ANSI.reset}`, '128.122.1.1', 8.4, 1.5), delay: 500 },
+    { text: hop(4, `${ANSI.cyan}dataearn.startup${ANSI.reset}`, '10.20.0.1', 18.7, 4.2), delay: 600 },
+    { text: `${ANSI.dim} 5${ANSI.reset}  ${ANSI.dim}* * *${ANSI.reset}`, delay: 1800 },
+    { text: hop(6, 'sales.detour.net', '10.30.0.1', 28.1, 6.0), delay: 400 },
+    { text: hop(7, `${ANSI.green}manhattan-wine.co${ANSI.reset}`, '10.40.0.1', 12.3, 2.1), delay: 500 },
+    { text: hop(8, `${ANSI.green}vault-os.internal${ANSI.reset}`, '10.50.0.1', 4.2, 0.8), delay: 400 },
+    { text: hop(9, `${ANSI.bold}otisscott.me${ANSI.reset}`, '76.76.21.21', 2.1, 0.4), delay: 300 },
+  ];
+
+  let i = 0;
+  const next = () => {
+    if (i < hops.length) {
+      term.write(`\r\n${hops[i].text}`);
+      i++;
+      if (i < hops.length) {
+        setTimeout(next, hops[i].delay);
+      } else {
+        resetInput();
+        writePrompt();
+      }
+    }
+  };
+  setTimeout(next, hops[0].delay);
+}
+
+/**
  * SSH connection animation — fire-and-forget (like rm -rf pattern)
  */
 export function startSsh(ctx: TerminalContext): void {
