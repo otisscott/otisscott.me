@@ -102,46 +102,59 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     const input = inputBufferRef.current;
     const { completions, prefix } = getCompletions(input);
 
-    if (completions.length === 0) {
+    if (completions.length === 0) return;
+
+    const parts = input.split(' ');
+    const isCmd = parts.length === 1 && !input.includes(' ');
+
+    const updateInput = (value: string) => {
+      inputBufferRef.current = value;
+      cursorPositionRef.current = value.length;
+      if (xtermRef.current) {
+        xtermRef.current.write('\r\x1b[K');
+        writeShortPrompt();
+        xtermRef.current.write(value);
+      }
+    };
+
+    if (completions.length === 1) {
+      // Single match — complete it (completions already include full path)
+      if (isCmd) {
+        updateInput(completions[0] + ' ');
+      } else {
+        updateInput(`${parts[0]} ${completions[0]}`);
+      }
+      tabPressCountRef.current = 0;
       return;
     }
 
-    if (completions.length === 1) {
-      const parts = input.split(' ');
-      if (parts.length === 1) {
-        inputBufferRef.current = completions[0] + ' ';
-        cursorPositionRef.current = inputBufferRef.current.length;
-      } else {
-        const cmd = parts[0];
-        const rest = parts.slice(1).join(' ');
-        const lastSlashIndex = rest.lastIndexOf('/');
-        const dirPart = lastSlashIndex >= 0 ? rest.slice(0, lastSlashIndex + 1) : '';
-        inputBufferRef.current = `${cmd} ${dirPart}${completions[0]}`;
-        cursorPositionRef.current = inputBufferRef.current.length;
-      }
+    // Multiple matches — find longest common prefix
+    const lcp = completions.reduce((p, c) => {
+      while (!c.startsWith(p)) p = p.slice(0, -1);
+      return p;
+    }, completions[0]);
 
+    if (lcp.length > prefix.length) {
+      // Can extend to LCP
+      if (isCmd) {
+        updateInput(lcp);
+      } else {
+        updateInput(`${parts[0]} ${lcp}`);
+      }
+      tabPressCountRef.current = 0;
+    } else {
+      // Already at LCP — show all options immediately
       if (xtermRef.current) {
-        xtermRef.current.write('\r\x1b[K');
+        const display = completions.map(c => {
+          const slash = c.lastIndexOf('/');
+          return slash >= 0 ? c.slice(slash + 1) : c;
+        });
+        xtermRef.current.writeln('');
+        xtermRef.current.writeln(display.join('  '));
         writeShortPrompt();
         xtermRef.current.write(inputBufferRef.current);
       }
       tabPressCountRef.current = 0;
-    } else {
-      if (tabPressCountRef.current === 0 || lastTabInputRef.current !== input) {
-        tabPressCountRef.current = 1;
-        lastTabInputRef.current = input;
-        if (xtermRef.current) {
-          xtermRef.current.write('\x07');
-        }
-      } else {
-        tabPressCountRef.current = 0;
-        if (xtermRef.current) {
-          xtermRef.current.writeln('');
-          xtermRef.current.writeln(completions.join('  '));
-          writeShortPrompt();
-          xtermRef.current.write(inputBufferRef.current);
-        }
-      }
     }
   }, [writeShortPrompt]);
 
