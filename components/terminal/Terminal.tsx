@@ -659,10 +659,10 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         handleCommand(inputBufferRef.current);
       } else if (code === 127) {
         if (cursorPositionRef.current > 0) {
-          inputBufferRef.current = inputBufferRef.current.slice(0, cursorPositionRef.current - 1) +
-                                   inputBufferRef.current.slice(cursorPositionRef.current);
+          const after = inputBufferRef.current.slice(cursorPositionRef.current);
+          inputBufferRef.current = inputBufferRef.current.slice(0, cursorPositionRef.current - 1) + after;
           cursorPositionRef.current--;
-          term.write('\b \b');
+          term.write('\b' + after + ' ' + `\x1b[${after.length + 1}D`);
         }
       } else if (code === 27 && data.length === 3) {
         if (data === '\x1b[A') {
