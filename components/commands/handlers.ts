@@ -473,8 +473,13 @@ export function neofetchCommand(loadTime: number, cols: number): string {
     : `${uptimeSec}s`;
 
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown';
-  // Android UA contains "Linux", so check it first
+  const maxTouch = typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0;
+  // Order matters: Android UA contains "Linux", iOS UA contains "Mac"
+  // iPadOS desktop mode sends macOS UA but has maxTouchPoints > 1
   const os = userAgent.includes('Android') ? 'Android' :
+             userAgent.includes('iPhone') ? 'iOS' :
+             userAgent.includes('iPad') ? 'iPadOS' :
+             (userAgent.includes('Mac') && maxTouch > 1) ? 'iPadOS' :
              userAgent.includes('Mac') ? 'macOS' :
              userAgent.includes('Win') ? 'Windows' :
              userAgent.includes('Linux') ? 'Linux' : 'Unknown OS';
@@ -595,9 +600,11 @@ export function neofetchCommand(loadTime: number, cols: number): string {
     ],
   };
 
+  // iOS/iPadOS use the Apple logo
+  const logoKey = (os === 'iOS' || os === 'iPadOS') ? 'macOS' : os;
   const logo = compact
-    ? (smallLogos[os] || smallLogos['Linux'])
-    : (fullLogos[os] || fullLogos['Linux']);
+    ? (smallLogos[logoKey] || smallLogos['Linux'])
+    : (fullLogos[logoKey] || fullLogos['Linux']);
 
   const info = [
     `${w}${ANSI.bold}otis${R}${w}@${ANSI.bold}otisscott.me${R}`,
