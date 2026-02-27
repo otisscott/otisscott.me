@@ -2,7 +2,7 @@
 
 A terminal-emulated personal website built with Next.js, TypeScript, and xterm.js. Features a fully functional terminal interface with 40+ commands, multiple themes, and easter eggs.
 
-![Terminal Portfolio](screenshots/06-neofetch.png)
+![Terminal Portfolio](screenshots/readme-hero.png)
 
 ## Features
 
