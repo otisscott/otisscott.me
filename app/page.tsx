@@ -9,7 +9,7 @@ const Terminal = dynamic(() => import('@/components/terminal/Terminal'), {
     <div 
       style={{ 
         width: '100%', 
-        height: '100dvh',
+        height: 'var(--app-height, 100dvh)',
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
@@ -28,7 +28,7 @@ export default function Home() {
     <main
       style={{
         width: '100vw',
-        height: '100dvh',
+        height: 'var(--app-height, 100dvh)',
         overflow: 'hidden',
       }}
     >
