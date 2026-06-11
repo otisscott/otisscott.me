@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { useRef, useCallback, useLayoutEffect } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -46,12 +46,18 @@ import {
   jobsCommand,
   fgCommand,
   bgCommand,
+  fortuneCommand,
+  getFortune,
+  figletCommand,
+  wineCommand,
+  momoCommand,
+  lolcat,
   getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
 import type { Job } from '@/components/commands/handlers';
-import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode, startTraceroute, startSsh, startHtop, startMake, startScp, startBgJob } from '@/components/commands/interactive';
-import { ANSI, padEndVisible } from '@/lib/filesystem/types';
+import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode, startTraceroute, startSsh, startHtop, startMake, startScp, startBgJob, startMatrix, startSnake, startWeather, startYes, startKonami, startScreensaver, startAquarium } from '@/components/commands/interactive';
+import { ANSI, padEndVisible, stripAnsi } from '@/lib/filesystem/types';
 
 interface TerminalProps {
   onCommand?: (command: string) => void;
@@ -68,23 +74,29 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   const historyIndexRef = useRef(-1);
   const cursorPositionRef = useRef(0);
   const tabPressCountRef = useRef(0);
-  const lastTabInputRef = useRef('');
   const ghostTextRef = useRef('');
   const currentThemeRef = useRef('tokyo-night');
   const colorModeRef = useRef<ColorMode>('dark');
   const interactiveModeRef = useRef<((data: string) => void) | null>(null);
-  const loadTimeRef = useRef(Date.now());
+  const loadTimeRef = useRef<number | null>(null);
   const aliasesRef = useRef<Record<string, string>>({});
   const jobsRef = useRef<Job[]>([]);
   const nextJobIdRef = useRef(1);
   const promptMultilineRef = useRef(false);
+  const konamiRef = useRef<string[]>([]);
+  const lastActivityRef = useRef<number | null>(null);
+
+  const getPromptInfo = useCallback(() => {
+    const cols = xtermRef.current?.cols ?? 80;
+    return generatePromptInfo(cols < 56);
+  }, []);
 
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
-      xtermRef.current.write('\r\n' + generatePromptInfo() + '\r\n' + generatePromptSymbol());
+      xtermRef.current.write('\r\n' + getPromptInfo() + '\r\n' + generatePromptSymbol());
       promptMultilineRef.current = true;
     }
-  }, []);
+  }, [getPromptInfo]);
 
   const writeShortPrompt = useCallback(() => {
     if (xtermRef.current) {
@@ -226,28 +238,63 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
       // Resolve aliases (single-pass)
       const resolved = resolveAlias(trimmedCommand, aliasesRef.current);
 
-      // Pipe detection: history | grep <pattern>
+      // Pipes: <producer> | <filter> [| <filter> ...]
+      // e.g. fortune | cowsay | lolcat, figlet otis | lolcat, history | grep ls
       if (resolved.includes(' | ')) {
-        const [left, ...rightParts] = resolved.split(' | ');
-        const right = rightParts.join(' | ').trim();
-        if (left.trim() === 'history' && right.startsWith('grep')) {
-          const pattern = right.replace(/^grep\s*/, '').trim();
-          if (!pattern) {
-            writeOutput(`${ANSI.red}usage: history | grep <pattern>${ANSI.reset}`);
-          } else {
-            const histOutput = historyCommand(commandHistoryRef.current);
-            const filtered = histOutput.split('\n').filter(line =>
-              line.toLowerCase().includes(pattern.toLowerCase())
-            );
-            writeOutput(filtered.length > 0 ? filtered.join('\n') : `${ANSI.dim}No matches for "${pattern}"${ANSI.reset}`);
-          }
-          setExitCode(0);
-          inputBufferRef.current = '';
-          cursorPositionRef.current = 0;
-          tabPressCountRef.current = 0;
-          writePrompt();
-          return;
+        const cols = xtermRef.current?.cols ?? 80;
+        const segments = resolved.split('|').map(s => s.trim()).filter(Boolean);
+        const [first, ...filters] = segments;
+        const [pCmd, ...pArgs] = first.split(' ');
+
+        let out: string | null;
+        switch (pCmd) {
+          case 'fortune': out = getFortune(); break;
+          case 'echo': out = pArgs.join(' '); break;
+          case 'figlet': out = figletCommand(pArgs, cols); break;
+          case 'cowsay': out = cowsayCommand(pArgs, cols); break;
+          case 'whoami': out = whoamiCommand(); break;
+          case 'date': out = dateCommand(); break;
+          case 'pwd': out = pwdCommand(); break;
+          case 'cat': out = catCommand(pArgs); break;
+          case 'ls': out = lsCommand(pArgs); break;
+          case 'history': out = historyCommand(commandHistoryRef.current); break;
+          default: out = null;
         }
+
+        if (out === null) {
+          writeOutput(`${ANSI.red}zsh: '${pCmd}' can't start a pipe here${ANSI.reset}\n${ANSI.dim}Pipeable: fortune, echo, figlet, cowsay, cat, ls, history, whoami, date, pwd${ANSI.reset}`);
+        } else {
+          let piped: string = out;
+          for (const seg of filters) {
+            const [fCmd, ...fArgs] = seg.split(' ');
+            if (fCmd === 'lolcat') {
+              piped = lolcat(piped);
+            } else if (fCmd === 'cowsay') {
+              piped = cowsayCommand([stripAnsi(piped)], cols);
+            } else if (fCmd === 'grep') {
+              const pattern = fArgs.join(' ');
+              if (!pattern) {
+                piped = `${ANSI.red}usage: ... | grep <pattern>${ANSI.reset}`;
+                break;
+              }
+              const matched = piped.split('\n').filter(line =>
+                stripAnsi(line).toLowerCase().includes(pattern.toLowerCase())
+              );
+              piped = matched.length > 0 ? matched.join('\n') : `${ANSI.dim}No matches for "${pattern}"${ANSI.reset}`;
+            } else {
+              piped = `${ANSI.red}zsh: '${fCmd}' is not a valid pipe target${ANSI.reset}\n${ANSI.dim}Try: cowsay, lolcat, grep${ANSI.reset}`;
+              break;
+            }
+          }
+          writeOutput(piped);
+        }
+
+        setExitCode(0);
+        inputBufferRef.current = '';
+        cursorPositionRef.current = 0;
+        tabPressCountRef.current = 0;
+        writePrompt();
+        return;
       }
 
       // Trailing & detection: background job
@@ -280,7 +327,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
 
       switch (cmd) {
         case 'help':
-          writeOutput(helpCommand());
+          writeOutput(helpCommand(xtermRef.current?.cols ?? 80));
           break;
         case 'clear':
           xtermRef.current?.clear();
@@ -332,10 +379,10 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           writeOutput(glCommand());
           break;
         case 'neofetch':
-          writeOutput(neofetchCommand(loadTimeRef.current, xtermRef.current?.cols ?? 80));
+          writeOutput(neofetchCommand(loadTimeRef.current ?? Date.now(), xtermRef.current?.cols ?? 80));
           break;
         case 'cowsay':
-          writeOutput(cowsayCommand(args));
+          writeOutput(cowsayCommand(args, xtermRef.current?.cols ?? 80));
           break;
         case 'sudo':
           writeOutput(sudoCommand(args));
@@ -444,10 +491,10 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           }
           break;
         case 'uptime':
-          writeOutput(uptimeCommand(loadTimeRef.current));
+          writeOutput(uptimeCommand(loadTimeRef.current ?? Date.now()));
           break;
         case 'docker':
-          writeOutput(dockerCommand(args, loadTimeRef.current));
+          writeOutput(dockerCommand(args, loadTimeRef.current ?? Date.now()));
           break;
         case 'traceroute':
           if (xtermRef.current) {
@@ -464,7 +511,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         case 'htop':
         case 'top':
           if (xtermRef.current) {
-            startHtop(getTerminalContext(), loadTimeRef.current);
+            startHtop(getTerminalContext(), loadTimeRef.current ?? Date.now());
             return;
           }
           break;
@@ -514,6 +561,62 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           // Clean up completed jobs older than the list view
           writeOutput(jobsCommand(jobsRef.current));
           break;
+        case 'fortune':
+          writeOutput(fortuneCommand(xtermRef.current?.cols ?? 80));
+          break;
+        case 'figlet':
+          writeOutput(figletCommand(args, xtermRef.current?.cols ?? 80));
+          break;
+        case 'wine':
+          writeOutput(wineCommand(args, xtermRef.current?.cols ?? 80));
+          break;
+        case 'momo':
+          writeOutput(momoCommand(args));
+          break;
+        case 'lolcat':
+          writeOutput(`${ANSI.dim}usage: <command> | lolcat${ANSI.reset}\n${lolcat('Try: figlet otis | lolcat')}`);
+          break;
+        case 'yes':
+          if (xtermRef.current) {
+            startYes(getTerminalContext(), args);
+            return;
+          }
+          break;
+        case 'asciiquarium':
+        case 'aquarium':
+          if (xtermRef.current) {
+            startAquarium(getTerminalContext());
+            return;
+          }
+          break;
+        case 'screensaver':
+          if (xtermRef.current) {
+            startScreensaver(getTerminalContext());
+            return;
+          }
+          break;
+        case 'konami':
+          writeOutput(`${ANSI.dim}That's not how cheat codes work. Use the actual buttons:${ANSI.reset}\n${ANSI.bold}↑ ↑ ↓ ↓ ← → ← → B A${ANSI.reset}`);
+          break;
+        case 'snake':
+          if (xtermRef.current) {
+            startSnake(getTerminalContext());
+            return;
+          }
+          break;
+        case 'matrix':
+        case 'cmatrix':
+          if (xtermRef.current) {
+            startMatrix(getTerminalContext());
+            return;
+          }
+          break;
+        case 'weather':
+          if (xtermRef.current) {
+            startWeather(getTerminalContext(), args);
+            return;
+          }
+          break;
         case 'fg':
           writeOutput(fgCommand(args, jobsRef.current));
           break;
@@ -536,6 +639,8 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     if (!terminalRef.current || xtermRef.current) return;
 
     const wrapper = terminalRef.current;
+    loadTimeRef.current = Date.now();
+    lastActivityRef.current = Date.now();
 
     // Detect system color scheme
     const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -546,10 +651,12 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     const term = new XTerm({
       theme: initialVariant.xterm,
       fontFamily: '"SF Mono", "Fira Code", "JetBrains Mono", "Consolas", "Monaco", "Courier New", monospace',
-      fontSize: 14,
+      fontSize: window.matchMedia('(max-width: 480px)').matches ? 12 : 14,
+      lineHeight: 1.25,
       cursorBlink: true,
       cursorStyle: 'block',
       scrollback: 10000,
+      scrollOnUserInput: true,
     });
 
     // Set initial CSS vars
@@ -600,14 +707,17 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         term.writeln(` Type ${ANSI.green}help${ANSI.reset} for commands`);
       }
 
-      term.write(generatePromptInfo() + '\r\n' + generatePromptSymbol());
+      term.write(getPromptInfo() + '\r\n' + generatePromptSymbol());
       promptMultilineRef.current = true;
     };
 
     // Fit terminal using FitAddon (which properly measures char dimensions)
     const fitTerminal = () => {
       if (fitAddonRef.current && xtermRef.current) {
+        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+        document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
         fitAddonRef.current.fit();
+        xtermRef.current.scrollToBottom();
       }
     };
 
@@ -639,12 +749,34 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
       requestAnimationFrame(initTerminal);
     }
 
-    // Window resize handler
-    const handleWindowResize = () => {
+    const handleViewportResize = () => {
       fitTerminal();
     };
 
-    window.addEventListener('resize', handleWindowResize);
+    window.addEventListener('resize', handleViewportResize);
+    window.visualViewport?.addEventListener('resize', handleViewportResize);
+    window.visualViewport?.addEventListener('scroll', handleViewportResize);
+
+    const handleTerminalFocus = () => {
+      requestAnimationFrame(() => {
+        fitTerminal();
+        xtermRef.current?.scrollToBottom();
+      });
+    };
+    wrapper.addEventListener('focusin', handleTerminalFocus);
+
+    // Idle screensaver — only kicks in at an empty prompt
+    const IDLE_MS = 3 * 60 * 1000;
+    const idleInterval = window.setInterval(() => {
+      if (
+        Date.now() - (lastActivityRef.current ?? Date.now()) > IDLE_MS &&
+        !interactiveModeRef.current &&
+        inputBufferRef.current === ''
+      ) {
+        lastActivityRef.current = Date.now();
+        startScreensaver(getTerminalContext());
+      }
+    }, 10000);
 
     // Listen for system color scheme changes
     const handleColorSchemeChange = (e: MediaQueryListEvent) => {
@@ -655,9 +787,26 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     darkQuery.addEventListener('change', handleColorSchemeChange);
 
     term.onData((data) => {
+      lastActivityRef.current = Date.now();
+
       // Interactive mode intercept (e.g., vim command buffer)
       if (interactiveModeRef.current) {
         interactiveModeRef.current(data);
+        return;
+      }
+
+      // Konami code detection — only at the shell prompt
+      const konamiToken =
+        data === '\x1b[A' ? 'U' :
+        data === '\x1b[B' ? 'D' :
+        data === '\x1b[C' ? 'R' :
+        data === '\x1b[D' ? 'L' :
+        data.length === 1 ? data.toLowerCase() : '?';
+      konamiRef.current.push(konamiToken);
+      if (konamiRef.current.length > 10) konamiRef.current.shift();
+      if (konamiRef.current.join('') === 'UUDDLRLRba') {
+        konamiRef.current = [];
+        startKonami(getTerminalContext());
         return;
       }
 
@@ -734,10 +883,14 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         term.write('^C');
         inputBufferRef.current = '';
         cursorPositionRef.current = 0;
+        historyIndexRef.current = commandHistoryRef.current.length;
+        tabPressCountRef.current = 0;
         writePrompt();
       } else if (code === 4) {
         inputBufferRef.current = '';
         cursorPositionRef.current = 0;
+        historyIndexRef.current = commandHistoryRef.current.length;
+        tabPressCountRef.current = 0;
         writePrompt();
       } else if (code >= 32 && code < 127) {
         promptMultilineRef.current = false;
@@ -768,12 +921,16 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     xtermRef.current = term;
 
     return () => {
-      window.removeEventListener('resize', handleWindowResize);
+      window.removeEventListener('resize', handleViewportResize);
+      window.visualViewport?.removeEventListener('resize', handleViewportResize);
+      window.visualViewport?.removeEventListener('scroll', handleViewportResize);
+      wrapper.removeEventListener('focusin', handleTerminalFocus);
       darkQuery.removeEventListener('change', handleColorSchemeChange);
+      clearInterval(idleInterval);
       term.dispose();
       xtermRef.current = null;
     };
-  }, [handleCommand, handleTabCompletion, computeGhostText, onData, writePrompt, writeShortPrompt, applyTheme]);
+  }, [handleCommand, handleTabCompletion, computeGhostText, onData, writePrompt, writeShortPrompt, applyTheme, getPromptInfo, getTerminalContext]);
 
   return (
     <div

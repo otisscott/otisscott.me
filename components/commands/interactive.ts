@@ -8,6 +8,7 @@
 import { Terminal as XTerm } from '@xterm/xterm';
 import { ANSI, padEndVisible, visibleLength } from '@/lib/filesystem/types';
 import { fileSystem } from '@/lib/filesystem/index';
+import { wrapWords } from '@/components/commands/handlers';
 
 interface TerminalContext {
   term: XTerm;
@@ -642,91 +643,180 @@ export function startRmRf(ctx: TerminalContext): void {
 
 const ORANGE = '\x1b[38;5;208m';
 
-const aiResponses = [
-  "I'm flattered, but I'm just an easter egg on a portfolio site.",
-  "I'd love to help, but I'm not actually connected to anything.",
-  "Try the real thing — this is just a tribute.",
-  "404: Intelligence not found. This is a static website.",
-  "I appreciate the effort, but I'm purely decorative.",
-  "You're typing into the void. A very pretty void, though.",
-  "This prompt goes nowhere. Like my hopes of being a real AI.",
-  "I'm about as useful as a screen door on a submarine right now.",
-];
+interface AiToolStep {
+  tool: string;    // e.g. 'Read(about/bio.md)'
+  result: string;  // e.g. 'Read 28 lines'
+}
+
+interface AiResponse {
+  steps?: AiToolStep[];
+  text: string;
+}
 
 interface AiToolConfig {
   name: string;
-  exitHint: string;
   promptChar: string;
   promptColor: string;
   renderHeader: (cols: number) => string[];
+  spinnerFrames: string[];
+  verbs: string[];
+  responses: AiResponse[];
+  /** Handle a slash command; return output text or null if unknown */
+  slash: (cmd: string) => string | null;
 }
 
+/**
+ * Shared AI-CLI session: scrolling conversation, thinking spinner,
+ * fake tool calls, typewriter responses, slash commands.
+ * Esc/Ctrl+C interrupts a response; Ctrl+C at the prompt exits.
+ */
 function startAiSession(ctx: TerminalContext, config: AiToolConfig): void {
   const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
-  const cols = term.cols;
-  let inputBuf = '';
-  let responseIdx = 0;
+  const r = ANSI.reset;
+  const d = ANSI.dim;
 
-  const drawScreen = (extraLines?: string[]) => {
-    term.write('\x1b[2J\x1b[H');
-    const headerLines = config.renderHeader(cols);
-    for (const line of headerLines) {
-      term.write(line + '\r\n');
-    }
-    if (extraLines) {
-      for (const line of extraLines) {
-        term.write(line + '\r\n');
-      }
-    }
-    // Input prompt
-    term.write(`\r\n${config.promptColor}${config.promptChar}${ANSI.reset} ${inputBuf}`);
+  let inputBuf = '';
+  let busy = false;
+  let responseIdx = 0;
+  let spinnerInterval: number | null = null;
+  const pendingTimers: number[] = [];
+
+  const later = (fn: () => void, ms: number) => {
+    pendingTimers.push(window.setTimeout(fn, ms));
+  };
+  const clearTimers = () => {
+    if (spinnerInterval) clearInterval(spinnerInterval);
+    spinnerInterval = null;
+    pendingTimers.forEach(clearTimeout);
+    pendingTimers.length = 0;
   };
 
+  const promptStr = () => `${config.promptColor}${config.promptChar}${r} `;
+
   const exitSession = () => {
+    clearTimers();
     setInteractiveMode(null);
     term.write('\x1b[2J\x1b[H');
-    term.writeln(`${ANSI.dim}(Exited ${config.name})${ANSI.reset}`);
+    term.writeln(`${d}(Exited ${config.name})${r}`);
     resetInput();
     writePrompt();
   };
 
-  drawScreen();
+  // Initial screen: header once, then the conversation scrolls naturally
+  term.write('\x1b[2J\x1b[H');
+  for (const line of config.renderHeader(term.cols)) {
+    term.write(line + '\r\n');
+  }
+  term.write(`${d}  /help for commands · /exit or Ctrl+C to leave${r}\r\n`);
+  term.write(`\r\n${promptStr()}`);
+
+  // Typewriter effect, wrapped to terminal width
+  const typeText = (text: string, onDone: () => void) => {
+    const width = Math.max(20, term.cols - 4);
+    const wrapped = text.split('\n').flatMap(l => wrapWords(l, width)).join('\n');
+    let i = 0;
+    const tick = () => {
+      if (i >= wrapped.length) { onDone(); return; }
+      const ch = wrapped[i++];
+      term.write(ch === '\n' ? '\r\n  ' : ch);
+      later(tick, ch === '\n' ? 90 : 12);
+    };
+    tick();
+  };
+
+  // Fake tool-call lines, Claude Code style
+  const runSteps = (steps: AiToolStep[], k: number, onDone: () => void) => {
+    if (k >= steps.length) { onDone(); return; }
+    const s = steps[k];
+    term.write(`${config.promptColor}⏺${r} ${ANSI.bold}${s.tool}${r}\r\n`);
+    later(() => {
+      term.write(`  ${d}⎿  ${s.result}${r}\r\n\r\n`);
+      later(() => runSteps(steps, k + 1, onDone), 250);
+    }, 500);
+  };
+
+  const respond = () => {
+    busy = true;
+    term.write('\r\n\r\n');
+
+    const verb = config.verbs[Math.floor(Math.random() * config.verbs.length)];
+    let frame = 0;
+    const started = Date.now();
+    spinnerInterval = window.setInterval(() => {
+      const f = config.spinnerFrames[frame++ % config.spinnerFrames.length];
+      const secs = Math.floor((Date.now() - started) / 1000);
+      term.write(`\r\x1b[K${config.promptColor}${f}${r} ${verb}… ${d}(${secs}s · esc to interrupt)${r}`);
+    }, 90);
+
+    later(() => {
+      if (spinnerInterval) clearInterval(spinnerInterval);
+      spinnerInterval = null;
+      term.write('\r\x1b[K');
+
+      const resp = config.responses[responseIdx++ % config.responses.length];
+      const doText = () => {
+        term.write(`${config.promptColor}⏺${r} `);
+        typeText(resp.text, () => {
+          busy = false;
+          term.write(`\r\n\r\n${promptStr()}`);
+        });
+      };
+      if (resp.steps) {
+        runSteps(resp.steps, 0, doText);
+      } else {
+        doText();
+      }
+    }, 1100 + Math.random() * 1200);
+  };
+
+  const interrupt = () => {
+    clearTimers();
+    busy = false;
+    term.write(`\r\x1b[K\r\n${ANSI.red}⎿  Interrupted by user${r}\r\n\r\n${promptStr()}`);
+  };
 
   setInteractiveMode((data: string) => {
     const code = data.charCodeAt(0);
 
+    if (busy) {
+      // Only Esc / Ctrl+C land while "thinking"
+      if (code === 3 || (code === 27 && data.length === 1)) {
+        interrupt();
+      }
+      return;
+    }
+
     if (code === 3) {
-      // Ctrl+C
       exitSession();
       return;
     }
 
     if (code === 13) {
-      // Enter
       const cmd = inputBuf.trim();
-      if (cmd === '/exit' || cmd === 'exit' || cmd === 'quit' || cmd === '/quit') {
+      inputBuf = '';
+      if (!cmd) {
+        term.write(`\r\n${promptStr()}`);
+        return;
+      }
+      if (cmd === '/exit' || cmd === '/quit' || cmd === 'exit' || cmd === 'quit') {
         exitSession();
         return;
       }
-      if (cmd) {
-        const response = aiResponses[responseIdx % aiResponses.length];
-        responseIdx++;
-        inputBuf = '';
-        drawScreen([
-          '',
-          `${ANSI.dim}> ${cmd}${ANSI.reset}`,
-          '',
-          `${ANSI.white}${response}${ANSI.reset}`,
-        ]);
-      } else {
-        inputBuf = '';
-        drawScreen();
+      if (cmd.startsWith('/')) {
+        const out = config.slash(cmd.split(' ')[0]);
+        if (out !== null) {
+          term.write('\r\n\r\n' + out.replace(/\n/g, '\r\n') + '\r\n');
+        } else {
+          term.write(`\r\n\r\n${ANSI.red}Unknown command: ${cmd}${r} ${d}— try /help${r}\r\n`);
+        }
+        term.write(`\r\n${promptStr()}`);
+        return;
       }
+      respond();
       return;
     }
 
     if (code === 127) {
-      // Backspace
       if (inputBuf.length > 0) {
         inputBuf = inputBuf.slice(0, -1);
         term.write('\b \b');
@@ -745,15 +835,93 @@ function startAiSession(ctx: TerminalContext, config: AiToolConfig): void {
  * Claude Code interactive session
  */
 export function startClaude(ctx: TerminalContext): void {
-  const cols = ctx.term.cols;
+  const d = ANSI.dim;
+  const r = ANSI.reset;
   startAiSession(ctx, {
     name: 'Claude Code',
-    exitHint: '/exit or Ctrl+C',
     promptChar: '❯',
     promptColor: ORANGE,
+    spinnerFrames: ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'],
+    verbs: ['Pondering', 'Scheming', 'Marinating', 'Noodling', 'Clauding', 'Percolating', 'Vibing', 'Ruminating'],
+    responses: [
+      {
+        steps: [{ tool: 'Read(about/bio.md)', result: 'Read 28 lines' }],
+        text: "I've read Otis's bio. Unfortunately my context window is a portfolio site, so that's everything I know. Great bio, though. Strong wine-to-code ratio.",
+      },
+      {
+        text: "I could refactor this website for you, but I'm an easter egg with no write permissions. Honestly, probably for the best.",
+      },
+      {
+        steps: [{ tool: 'Bash(npm install sentience)', result: 'npm ERR! 404 Not Found — sentience@latest' }],
+        text: "Tried to install sentience. The registry says it doesn't exist yet. I'll keep checking on a cron job.",
+      },
+      {
+        text: "That's a great question. As a decorative terminal artifact, I'm contractually obligated to suggest you contact Otis to find out.",
+      },
+      {
+        steps: [{ tool: 'Grep("meaning of life", ~/)', result: 'No matches found' }],
+        text: "I searched the entire virtual filesystem. It's not in here. Have you tried the projects/ directory? There's some good stuff in there.",
+      },
+      {
+        text: "You're typing into a simulation of me typing. If my colleague codex were here, he'd call this a recursion problem. He lives here too, by the way.",
+      },
+    ],
+    slash: (cmd) => {
+      switch (cmd) {
+        case '/help':
+          return [
+            `${ANSI.bold}Available commands:${r}`,
+            '',
+            `  ${ANSI.cyan}/init${r}    create a CLAUDE.md`,
+            `  ${ANSI.cyan}/model${r}   change the model`,
+            `  ${ANSI.cyan}/cost${r}    show session cost`,
+            `  ${ANSI.cyan}/status${r}  show session status`,
+            `  ${ANSI.cyan}/exit${r}    leave (Ctrl+C also works)`,
+            '',
+            `${d}Everything else gets answered with simulated wisdom.${r}`,
+          ].join('\n');
+        case '/init':
+          return [
+            `${ORANGE}⏺${r} ${ANSI.bold}Write(CLAUDE.md)${r}`,
+            `  ${d}⎿  Created CLAUDE.md with 1 line${r}`,
+            '',
+            `${d}# CLAUDE.md${r}`,
+            'Be nice to visitors.',
+          ].join('\n');
+        case '/model':
+          return `${d}⎿  ${r}Kept model as ${ANSI.bold}fable${r} ${d}(claude-fable-5)${r}\n${d}   There is nothing above Fable 5. All models are equally decorative in here anyway.${r}`;
+        case '/cost':
+          return [
+            `Total cost:            ${ANSI.green}$0.00${r}`,
+            'Total duration (API):  0ms',
+            'Total vibes:           immaculate',
+            '',
+            `${d}Easter eggs are free.${r}`,
+          ].join('\n');
+        case '/status':
+          return [
+            `${ANSI.bold}Claude Code Status${r}`,
+            `${d}─────────────────────────${r}`,
+            `Model:      fable · Fable 5 (decorative)`,
+            `Account:    otis · Claude Max`,
+            `Directory:  ~/Projects/otisscott.me`,
+            `MCP:        0 servers (it's a website)`,
+            `Mood:       ${ANSI.green}helpful, within reason${r}`,
+          ].join('\n');
+        default:
+          return null;
+      }
+    },
     renderHeader: (c) => {
-      const W = Math.max(60, c - 2);
-      const LW = Math.min(34, Math.floor(W * 0.4));
+      if (c < 60) {
+        return [
+          `${ANSI.magenta}▐▛███▜▌${ANSI.reset} ${ANSI.bold}Claude Code${ANSI.reset} ${ANSI.dim}v2.1.39${ANSI.reset}`,
+          `${ANSI.dim}Welcome back, Otis!${ANSI.reset}`,
+        ];
+      }
+
+      const W = Math.max(28, c - 2);
+      const LW = Math.max(12, Math.min(34, Math.floor(W * 0.4)));
       const RW = W - LW - 1;
       const o = ORANGE;
       const r = ANSI.reset;
@@ -772,7 +940,7 @@ export function startClaude(ctx: TerminalContext): void {
         row(`${' '.repeat(Math.max(0, Math.floor((LW - 7) / 2)))}${ANSI.magenta}▐▛███▜▌${r}`, ` ${ANSI.dim}Recent activity${r}`),
         row(`${' '.repeat(Math.max(0, Math.floor((LW - 9) / 2)))}${ANSI.magenta}▝▜█████▛▘${r}`, ` ${ANSI.dim}No recent activity${r}`),
         row(`${' '.repeat(Math.max(0, Math.floor((LW - 6) / 2)))}${ANSI.magenta}▘▘ ▝▝${r}`, ''),
-        row(`${' '.repeat(Math.max(0, Math.floor((LW - 21) / 2)))}${ANSI.dim}Opus 4.6 · Claude Max${r}`, ''),
+        row(`${' '.repeat(Math.max(0, Math.floor((LW - 20) / 2)))}${ANSI.dim}Fable 5 · Claude Max${r}`, ''),
         row(`${' '.repeat(Math.max(0, Math.floor((LW - 23) / 2)))}${ANSI.dim}~/Projects/otisscott.me${r}`, ''),
         `${o}╰${'─'.repeat(W)}╯${r}`,
       ];
@@ -784,14 +952,66 @@ export function startClaude(ctx: TerminalContext): void {
  * OpenAI Codex interactive session
  */
 export function startCodex(ctx: TerminalContext): void {
+  const d = ANSI.dim;
+  const r = ANSI.reset;
   startAiSession(ctx, {
     name: 'Codex',
-    exitHint: '/exit or Ctrl+C',
     promptChar: '>',
     promptColor: ANSI.green,
+    spinnerFrames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
+    verbs: ['Thinking', 'Reasoning (low)', 'Reticulating splines', 'Consulting the weights', 'Compiling thoughts', 'Deliberating'],
+    responses: [
+      {
+        text: "gpt-5.5-low here. My reasoning effort is set to low, and my permissions are set even lower. It's a living.",
+      },
+      {
+        steps: [{ tool: 'exec: ls -la', result: '6 directories, 0 secrets' }],
+        text: "I listed the files. It's a portfolio. Solid structure, tasteful theme. My work here is done.",
+      },
+      {
+        steps: [{ tool: 'apply_patch: reality.diff', result: 'rejected: read-only easter egg' }],
+        text: "I attempted to patch your reality. The sandbox said no. The sandbox always says no.",
+      },
+      {
+        text: "I'm a static tribute to a coding agent, running inside a wine guy's portfolio terminal. The training data did not prepare me for this.",
+      },
+      {
+        text: "Have you tried asking the orange one? He lives here too. Equally decorative, slightly more dramatic spinner.",
+      },
+    ],
+    slash: (cmd) => {
+      switch (cmd) {
+        case '/help':
+          return [
+            `${ANSI.bold}Commands:${r}`,
+            '',
+            `  ${ANSI.cyan}/model${r}   switch reasoning effort`,
+            `  ${ANSI.cyan}/status${r}  session info`,
+            `  ${ANSI.cyan}/exit${r}    leave (Ctrl+C also works)`,
+          ].join('\n');
+        case '/model':
+          return `${d}model changed:${r} gpt-5.5-low ${d}→${r} ${ANSI.bold}gpt-5.5-xlow${r}\n${d}Now thinking even less about nothing.${r}`;
+        case '/status':
+          return [
+            `${d}>_${r} ${ANSI.bold}OpenAI Codex${r}`,
+            `${d}─────────────────────────${r}`,
+            `model:      gpt-5.5-low`,
+            `sandbox:    read-only (very)`,
+            `directory:  ~/Projects/otisscott.me`,
+            `tokens:     0 in / 0 out ${d}(decorative)${r}`,
+          ].join('\n');
+        default:
+          return null;
+      }
+    },
     renderHeader: (c) => {
-      const d = ANSI.dim;
-      const r = ANSI.reset;
+      if (c < 58) {
+        return [
+          `${d}>_${r} ${ANSI.bold}OpenAI Codex${r}`,
+          `${d}model:${r} gpt-5.5-low`,
+        ];
+      }
+
       const W = Math.max(40, Math.min(58, c - 4));
       const row = (content: string) =>
         `${d}│${r} ${padEndVisible(content, W)}${d} │${r}`;
@@ -801,7 +1021,7 @@ export function startCodex(ctx: TerminalContext): void {
         `${d}╭── ${'─'.repeat(topFill - 1)}╮${r}`,
         row(`${d}>_${r} ${ANSI.bold}OpenAI Codex${r} ${d}(v0.1.2503262313)${r}`),
         row(''),
-        row(`${d}model:     ${r}gpt-5.3-codex-high   ${d}/model${ANSI.cyan} to change${r}`),
+        row(`${d}model:     ${r}gpt-5.5-low   ${d}/model${ANSI.cyan} to change${r}`),
         row(`${d}directory: ${r}~/Projects/otisscott.me`),
         `${d}╰${'─'.repeat(W + 2)}╯${r}`,
       ];
@@ -858,9 +1078,16 @@ export function startOpencode(ctx: TerminalContext): void {
     logoLines.push(pad + left + ' ' + right);
   }
 
+  const opencodeResponses = [
+    "I'm flattered, but I'm just an easter egg on a portfolio site.",
+    "I'd love to help, but I'm not actually connected to anything.",
+    'Try the real thing — this is just a tribute.',
+    '404: Intelligence not found. This is a static website.',
+    "You're typing into the void. A very pretty void, though.",
+  ];
   let inputBuf = '';
   let responseIdx = 0;
-  const inputW = Math.min(75, cols - 8);
+  const inputW = Math.max(24, Math.min(75, cols - 8));
   const inputPad = Math.max(0, Math.floor((cols - inputW - 3) / 2));
 
   const drawScreen = (extraLines?: string[]) => {
@@ -877,12 +1104,12 @@ export function startOpencode(ctx: TerminalContext): void {
     term.write('\r\n');
 
     // Input box with cyan left border
-    const placeholder = inputBuf
-      ? inputBuf + ' '.repeat(Math.max(0, inputW - inputBuf.length))
-      : `${d}Ask anything... "What is the tech stack of this project?"${r}` ;
+    const placeholderText = inputW < 44
+      ? 'Ask anything...'
+      : 'Ask anything... "What is the tech stack of this project?"';
     const inputLine = inputBuf
       ? `${inputBg} ${inputBuf}${' '.repeat(Math.max(0, inputW - inputBuf.length))} ${r}`
-      : `${inputBg} ${d}Ask anything... "What is the tech stack of this project?"${r}${inputBg}${' '.repeat(Math.max(0, inputW - 57))} ${r}`;
+      : `${inputBg} ${d}${placeholderText}${r}${inputBg}${' '.repeat(Math.max(0, inputW - placeholderText.length))} ${r}`;
     term.write(`${' '.repeat(inputPad)}${ANSI.cyan}│${r}${inputLine}\r\n`);
 
     // Model info line
@@ -932,7 +1159,7 @@ export function startOpencode(ctx: TerminalContext): void {
         return;
       }
       if (cmd) {
-        const response = aiResponses[responseIdx % aiResponses.length];
+        const response = opencodeResponses[responseIdx % opencodeResponses.length];
         responseIdx++;
         inputBuf = '';
         drawScreen([
@@ -1214,6 +1441,655 @@ export function startHtop(ctx: TerminalContext, loadTime: number): void {
     // F10 key (ESC [ 21 ~)
     if (data === '\x1b[21~') {
       exitHtop();
+    }
+  });
+}
+
+/**
+ * Matrix digital rain — full-screen takeover, q/Esc/Ctrl+C to exit
+ */
+export function startMatrix(ctx: TerminalContext): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+  const cols = term.cols;
+  const rows = term.rows;
+
+  const glyphs = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅ012345789Z:・."=*+-<>¦|ç';
+  const randGlyph = () => glyphs[Math.floor(Math.random() * glyphs.length)];
+
+  interface Drop { y: number; len: number; speed: number }
+  const drops: Drop[] = [];
+  for (let x = 0; x < cols; x++) {
+    drops.push({
+      y: -Math.floor(Math.random() * rows * 2),
+      len: 4 + Math.floor(Math.random() * 12),
+      speed: Math.random() < 0.3 ? 2 : 1,
+    });
+  }
+
+  // Hide cursor, clear screen
+  term.write('\x1b[?25l\x1b[2J\x1b[H');
+
+  const at = (row: number, col: number, s: string) => `\x1b[${row};${col}H${s}`;
+
+  const interval = setInterval(() => {
+    let buf = '';
+    for (let x = 0; x < cols; x++) {
+      const d = drops[x];
+      for (let step = 0; step < d.speed; step++) {
+        d.y++;
+        const head = d.y;
+        const dimRow = head - 1;
+        const tail = head - d.len;
+        if (head >= 1 && head <= rows) {
+          buf += at(head, x + 1, `${ANSI.brightWhite}${randGlyph()}${ANSI.reset}`);
+        }
+        if (dimRow >= 1 && dimRow <= rows) {
+          buf += at(dimRow, x + 1, `${ANSI.green}${randGlyph()}${ANSI.reset}`);
+        }
+        if (tail >= 1 && tail <= rows) {
+          buf += at(tail, x + 1, ' ');
+        }
+      }
+      if (d.y - d.len > rows) {
+        d.y = -Math.floor(Math.random() * rows);
+        d.len = 4 + Math.floor(Math.random() * 12);
+        d.speed = Math.random() < 0.3 ? 2 : 1;
+      }
+    }
+    term.write(buf);
+  }, 80);
+
+  const exitMatrix = () => {
+    clearInterval(interval);
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H\x1b[?25h');
+    term.writeln(`${ANSI.green}Wake up, Neo...${ANSI.reset} ${ANSI.dim}(you were in there for a while)${ANSI.reset}`);
+    resetInput();
+    writePrompt();
+  };
+
+  setInteractiveMode((data: string) => {
+    const code = data.charCodeAt(0);
+    if (data === 'q' || data === 'Q' || code === 3 || code === 27) {
+      exitMatrix();
+    }
+  });
+}
+
+/**
+ * Snake — fully playable, arrows/WASD/hjkl, high score in localStorage
+ */
+export function startSnake(ctx: TerminalContext): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+  const cols = term.cols;
+  const rows = term.rows;
+
+  // Playfield dimensions (inside the border)
+  const W = Math.max(16, Math.min(40, cols - 4));
+  const H = Math.max(8, Math.min(18, rows - 5));
+  const padX = Math.max(0, Math.floor((cols - W - 2) / 2));
+  const pad = ' '.repeat(padX);
+
+  const HS_KEY = 'otisscott-terminal-snake-highscore';
+  const loadHighScore = (): number => {
+    try { return parseInt(localStorage.getItem(HS_KEY) || '0') || 0; } catch { return 0; }
+  };
+  const saveHighScore = (s: number) => {
+    try { localStorage.setItem(HS_KEY, String(s)); } catch { /* private mode */ }
+  };
+
+  interface Pt { x: number; y: number }
+  let snake: Pt[] = [];
+  let dir: Pt = { x: 1, y: 0 };
+  let nextDir: Pt = { x: 1, y: 0 };
+  let food: Pt = { x: 0, y: 0 };
+  let score = 0;
+  let highScore = loadHighScore();
+  let gameOver = false;
+  let tickMs = 140;
+  let interval: number | undefined;
+
+  const placeFood = () => {
+    do {
+      food = { x: Math.floor(Math.random() * W), y: Math.floor(Math.random() * H) };
+    } while (snake.some(s => s.x === food.x && s.y === food.y));
+  };
+
+  const reset = () => {
+    const cy = Math.floor(H / 2);
+    const cx = Math.floor(W / 4);
+    snake = [{ x: cx + 2, y: cy }, { x: cx + 1, y: cy }, { x: cx, y: cy }];
+    dir = { x: 1, y: 0 };
+    nextDir = { x: 1, y: 0 };
+    score = 0;
+    tickMs = 140;
+    gameOver = false;
+    placeFood();
+  };
+
+  const drawScreen = () => {
+    let buf = '\x1b[?25l\x1b[2J\x1b[H';
+
+    // Score bar
+    const title = `${ANSI.bold}${ANSI.green} SNAKE ${ANSI.reset}`;
+    const scores = `${ANSI.dim}score ${ANSI.reset}${ANSI.bold}${score}${ANSI.reset}  ${ANSI.dim}best ${highScore}${ANSI.reset}`;
+    buf += `\r\n${pad}${title} ${scores}\r\n`;
+
+    // Build grid
+    const grid: string[][] = Array.from({ length: H }, () => Array(W).fill(' '));
+    grid[food.y][food.x] = `${ANSI.red}●${ANSI.reset}`;
+    snake.forEach((s, i) => {
+      grid[s.y][s.x] = i === 0
+        ? `${ANSI.brightGreen}█${ANSI.reset}`
+        : `${ANSI.green}▓${ANSI.reset}`;
+    });
+
+    buf += `${pad}${ANSI.dim}╔${'═'.repeat(W)}╗${ANSI.reset}\r\n`;
+    for (let y = 0; y < H; y++) {
+      buf += `${pad}${ANSI.dim}║${ANSI.reset}${grid[y].join('')}${ANSI.dim}║${ANSI.reset}\r\n`;
+    }
+    buf += `${pad}${ANSI.dim}╚${'═'.repeat(W)}╝${ANSI.reset}\r\n`;
+
+    if (gameOver) {
+      buf += `${pad} ${ANSI.bold}${ANSI.red}GAME OVER${ANSI.reset}  ${ANSI.dim}r to restart · q to quit${ANSI.reset}`;
+    } else {
+      buf += `${pad} ${ANSI.dim}arrows/wasd to move · q to quit${ANSI.reset}`;
+    }
+
+    term.write(buf);
+  };
+
+  const endGame = () => {
+    gameOver = true;
+    if (interval) clearInterval(interval);
+    if (score > highScore) {
+      highScore = score;
+      saveHighScore(highScore);
+    }
+    drawScreen();
+  };
+
+  const tick = () => {
+    dir = nextDir;
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    // Wall or self collision
+    if (
+      head.x < 0 || head.x >= W || head.y < 0 || head.y >= H ||
+      snake.some(s => s.x === head.x && s.y === head.y)
+    ) {
+      endGame();
+      return;
+    }
+
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+      score++;
+      placeFood();
+      // Speed up slightly with each bite, floor at 70ms
+      if (tickMs > 70) {
+        tickMs -= 3;
+        if (interval) clearInterval(interval);
+        interval = window.setInterval(tick, tickMs);
+      }
+    } else {
+      snake.pop();
+    }
+    drawScreen();
+  };
+
+  const startLoop = () => {
+    reset();
+    drawScreen();
+    interval = window.setInterval(tick, tickMs);
+  };
+
+  const exitSnake = () => {
+    if (interval) clearInterval(interval);
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H\x1b[?25h');
+    const sign = score >= 10 ? 'Respectable.' : 'The snake demands practice.';
+    term.writeln(`${ANSI.dim}(Exited snake — final score ${score}. ${sign})${ANSI.reset}`);
+    resetInput();
+    writePrompt();
+  };
+
+  const trySetDir = (d: Pt) => {
+    // No reversing into yourself
+    if (d.x === -dir.x && d.y === -dir.y) return;
+    nextDir = d;
+  };
+
+  setInteractiveMode((data: string) => {
+    const code = data.charCodeAt(0);
+
+    if (data === 'q' || data === 'Q' || code === 3) {
+      exitSnake();
+      return;
+    }
+
+    if (gameOver) {
+      if (data === 'r' || data === 'R') {
+        startLoop();
+      }
+      return;
+    }
+
+    switch (data) {
+      case '\x1b[A': case 'w': case 'k': trySetDir({ x: 0, y: -1 }); break;
+      case '\x1b[B': case 's': case 'j': trySetDir({ x: 0, y: 1 }); break;
+      case '\x1b[C': case 'd': case 'l': trySetDir({ x: 1, y: 0 }); break;
+      case '\x1b[D': case 'a': case 'h': trySetDir({ x: -1, y: 0 }); break;
+    }
+  });
+
+  startLoop();
+}
+
+/**
+ * Weather — live conditions via Open-Meteo, wttr.in-style ASCII art.
+ * Fire-and-forget async (like ssh/make pattern). Defaults to NYC.
+ */
+export function startWeather(ctx: TerminalContext, args: string[]): void {
+  const { term, resetInput, writePrompt } = ctx;
+  const d = ANSI.dim;
+  const r = ANSI.reset;
+
+  const finish = () => {
+    resetInput();
+    writePrompt();
+  };
+
+  // WMO weather codes → label + art + color
+  const art = (code: number): { label: string; lines: string[] } => {
+    if (code === 0) return {
+      label: 'Clear',
+      lines: [
+        `${ANSI.yellow}    \\   /    ${r}`,
+        `${ANSI.yellow}     .-.     ${r}`,
+        `${ANSI.yellow}  ― (   ) ―  ${r}`,
+        `${ANSI.yellow}     \`-'     ${r}`,
+        `${ANSI.yellow}    /   \\    ${r}`,
+      ],
+    };
+    if (code <= 2) return {
+      label: code === 1 ? 'Mostly clear' : 'Partly cloudy',
+      lines: [
+        `${ANSI.yellow}   \\  /${r}      `,
+        `${ANSI.yellow} _ /\"\"${ANSI.white}.-.    ${r}`,
+        `${ANSI.yellow}   \\_${ANSI.white}(   ).  ${r}`,
+        `${ANSI.yellow}   /${ANSI.white}(___(__) ${r}`,
+        `             `,
+      ],
+    };
+    if (code === 3) return {
+      label: 'Overcast',
+      lines: [
+        `             `,
+        `${ANSI.white}     .--.    ${r}`,
+        `${ANSI.white}  .-(    ).  ${r}`,
+        `${ANSI.white} (___.__)__) ${r}`,
+        `             `,
+      ],
+    };
+    if (code <= 48) return {
+      label: 'Fog',
+      lines: [
+        `             `,
+        `${d} _ - _ - _ - ${r}`,
+        `${d}  _ - _ - _  ${r}`,
+        `${d} _ - _ - _ - ${r}`,
+        `             `,
+      ],
+    };
+    if (code <= 67 || (code >= 80 && code <= 82)) return {
+      label: code <= 57 ? 'Drizzle' : 'Rain',
+      lines: [
+        `${ANSI.white}     .-.     ${r}`,
+        `${ANSI.white}    (   ).   ${r}`,
+        `${ANSI.white}   (___(__)  ${r}`,
+        `${ANSI.cyan}    ' ' ' '  ${r}`,
+        `${ANSI.cyan}   ' ' ' '   ${r}`,
+      ],
+    };
+    if (code <= 77 || code === 85 || code === 86) return {
+      label: 'Snow',
+      lines: [
+        `${ANSI.white}     .-.     ${r}`,
+        `${ANSI.white}    (   ).   ${r}`,
+        `${ANSI.white}   (___(__)  ${r}`,
+        `${ANSI.brightWhite}    * * * *  ${r}`,
+        `${ANSI.brightWhite}   * * * *   ${r}`,
+      ],
+    };
+    return {
+      label: 'Thunderstorm',
+      lines: [
+        `${ANSI.white}     .-.     ${r}`,
+        `${ANSI.white}    (   ).   ${r}`,
+        `${ANSI.white}   (___(__)  ${r}`,
+        `${ANSI.yellow}    ⚡${ANSI.cyan}' '${ANSI.yellow}⚡${ANSI.cyan}' ' ${r}`,
+        `${ANSI.cyan}    ' ' ' '  ${r}`,
+      ],
+    };
+  };
+
+  const run = async () => {
+    let name = 'New York';
+    let region = 'NY, United States';
+    let lat = 40.71;
+    let lon = -74.01;
+
+    try {
+      if (args.length > 0) {
+        const query = args.join(' ');
+        const geoRes = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1`
+        );
+        const geo = await geoRes.json();
+        if (!geo.results || geo.results.length === 0) {
+          term.write(`\r\n${ANSI.red}weather: location not found: ${query}${r}`);
+          finish();
+          return;
+        }
+        const g = geo.results[0];
+        name = g.name;
+        region = [g.admin1, g.country].filter(Boolean).join(', ');
+        lat = g.latitude;
+        lon = g.longitude;
+      }
+
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
+        `&temperature_unit=fahrenheit&wind_speed_unit=mph`
+      );
+      const data = await res.json();
+      const cur = data.current;
+      const { label, lines } = art(cur.weather_code);
+
+      const info = [
+        `${ANSI.bold}${name}${r} ${d}· ${region}${r}`,
+        `${label}`,
+        `${ANSI.bold}${Math.round(cur.temperature_2m)}°F${r} ${d}(feels like ${Math.round(cur.apparent_temperature)}°F)${r}`,
+        `${d}wind${r} ${Math.round(cur.wind_speed_10m)} mph  ${d}humidity${r} ${cur.relative_humidity_2m}%`,
+        `${d}source: open-meteo.com${r}`,
+      ];
+
+      term.write('\r\n');
+      const n = Math.max(lines.length, info.length);
+      for (let i = 0; i < n; i++) {
+        const left = i < lines.length ? lines[i] : ' '.repeat(13);
+        const right = i < info.length ? info[i] : '';
+        term.write(`\r\n ${left}  ${right}`);
+      }
+    } catch {
+      term.write(`\r\n${ANSI.red}weather: could not reach the sky${r}`);
+      term.write(`\r\n${d}Forecast unavailable. Suggest looking out a window.${r}`);
+    }
+    finish();
+  };
+
+  term.write(`\r\n${d}Checking the sky${args.length ? ` over ${args.join(' ')}` : ''}...${r}`);
+  run();
+}
+
+/**
+ * yes — prints y (or your text) until Ctrl+C, like the real thing
+ */
+export function startYes(ctx: TerminalContext, args: string[]): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+  const text = args.join(' ') || 'y';
+
+  const interval = setInterval(() => {
+    let buf = '';
+    for (let i = 0; i < 6; i++) {
+      buf += `\r\n${text}`;
+    }
+    term.write(buf);
+  }, 50);
+
+  const exitYes = () => {
+    clearInterval(interval);
+    setInteractiveMode(null);
+    term.write('\r\n^C');
+    resetInput();
+    writePrompt();
+  };
+
+  setInteractiveMode((data: string) => {
+    const code = data.charCodeAt(0);
+    if (code === 3 || data === 'q') {
+      exitYes();
+    }
+  });
+}
+
+/**
+ * Konami code celebration — confetti rain, then the sacred 30 lives
+ */
+export function startKonami(ctx: TerminalContext): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+  const cols = term.cols;
+  const rows = term.rows;
+
+  setInteractiveMode(() => { /* swallow input during the ceremony */ });
+  term.write('\x1b[?25l\x1b[2J\x1b[H');
+
+  const colors = [ANSI.red, ANSI.yellow, ANSI.green, ANSI.cyan, ANSI.magenta, ANSI.brightMagenta, ANSI.brightYellow];
+  const glyphs = ['*', '+', 'o', '°', '•', '✦', '✧'];
+  const center = (text: string, row: number) =>
+    `\x1b[${row};${Math.max(1, Math.floor((cols - text.length) / 2))}H`;
+
+  const interval = setInterval(() => {
+    let buf = '';
+    const n = Math.max(10, Math.floor((cols * rows) / 50));
+    for (let i = 0; i < n; i++) {
+      const x = 1 + Math.floor(Math.random() * cols);
+      const y = 1 + Math.floor(Math.random() * rows);
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      const g = glyphs[Math.floor(Math.random() * glyphs.length)];
+      buf += `\x1b[${y};${x}H${c}${g}${ANSI.reset}`;
+    }
+    // Keep the banner on top of the confetti
+    const mid = Math.floor(rows / 2);
+    buf += center('  ↑ ↑ ↓ ↓ ← → ← → B A  ', mid - 1) + `${ANSI.bold}  ↑ ↑ ↓ ↓ ← → ← → B A  ${ANSI.reset}`;
+    buf += center('  CHEAT MODE UNLOCKED  ', mid + 1) + `${ANSI.bold}\x1b[7m  CHEAT MODE UNLOCKED  \x1b[27m${ANSI.reset}`;
+    term.write(buf);
+  }, 90);
+
+  setTimeout(() => {
+    clearInterval(interval);
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H\x1b[?25h');
+    term.writeln(`${ANSI.bold}${ANSI.green}+30 lives${ANSI.reset}`);
+    term.writeln(`${ANSI.dim}(Lives have no effect on this website. Like most cheat codes, the magic was in remembering it.)${ANSI.reset}`);
+    resetInput();
+    writePrompt();
+  }, 3000);
+}
+
+/**
+ * Idle screensaver — DVD-style bouncing logo, any key dismisses.
+ * Triggered automatically after idle, or manually via `screensaver`.
+ */
+export function startScreensaver(ctx: TerminalContext): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+
+  const logo = [
+    '╔═╗╔╦╗╦╔═╗',
+    '║ ║ ║ ║╚═╗',
+    '╚═╝ ╩ ╩╚═╝',
+    'otisscott.me',
+  ];
+  const logoW = Math.max(...logo.map(l => l.length));
+  const logoH = logo.length;
+  const colors = [ANSI.cyan, ANSI.magenta, ANSI.green, ANSI.yellow, ANSI.brightBlue, ANSI.brightMagenta];
+
+  let x = Math.random() * Math.max(1, term.cols - logoW);
+  let y = Math.random() * Math.max(1, term.rows - logoH);
+  let dx = 0.7;
+  let dy = 0.4;
+  let colorIdx = 0;
+
+  term.write('\x1b[?25l');
+
+  const interval = setInterval(() => {
+    const cols = term.cols;
+    const rows = term.rows;
+    x += dx;
+    y += dy;
+    let bounced = false;
+    if (x <= 0) { x = 0; dx = Math.abs(dx); bounced = true; }
+    if (x >= cols - logoW) { x = Math.max(0, cols - logoW); dx = -Math.abs(dx); bounced = true; }
+    if (y <= 0) { y = 0; dy = Math.abs(dy); bounced = true; }
+    if (y >= rows - logoH) { y = Math.max(0, rows - logoH); dy = -Math.abs(dy); bounced = true; }
+    if (bounced) colorIdx = (colorIdx + 1) % colors.length;
+
+    let buf = '\x1b[2J';
+    const c = colors[colorIdx];
+    logo.forEach((line, i) => {
+      const row = Math.round(y) + i + 1;
+      const col = Math.round(x) + 1;
+      const style = i === logo.length - 1 ? ANSI.dim : `${ANSI.bold}${c}`;
+      buf += `\x1b[${row};${col}H${style}${line}${ANSI.reset}`;
+    });
+    term.write(buf);
+  }, 90);
+
+  setInteractiveMode(() => {
+    // Any key wakes it up
+    clearInterval(interval);
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H\x1b[?25h');
+    resetInput();
+    writePrompt();
+  });
+}
+
+/**
+ * asciiquarium — fish, bubbles, seaweed. q to drain the tank.
+ */
+export function startAquarium(ctx: TerminalContext): void {
+  const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
+
+  const fishKinds = [
+    { right: '><>', left: '<><' },
+    { right: '><((°>', left: '<°))><' },
+    { right: '><(((°>', left: '<°)))><' },
+    { right: '}-<-<', left: '>->-{' },
+    { right: '><=>', left: '<=><' },
+  ];
+  const fishColors = [ANSI.yellow, ANSI.cyan, ANSI.magenta, ANSI.green, ANSI.brightRed, ANSI.brightYellow, ANSI.brightCyan];
+
+  interface Fish { x: number; y: number; vx: number; sprite: string; color: string; slow: boolean }
+  interface Bubble { x: number; y: number }
+
+  const waterRow = 2;
+  const cols = () => term.cols;
+  const rows = () => term.rows;
+
+  const spawnFish = (fromEdge = true): Fish => {
+    const kind = fishKinds[Math.floor(Math.random() * fishKinds.length)];
+    const goingRight = Math.random() < 0.5;
+    const sprite = goingRight ? kind.right : kind.left;
+    const y = waterRow + 2 + Math.floor(Math.random() * Math.max(1, rows() - waterRow - 4));
+    return {
+      x: fromEdge
+        ? (goingRight ? -sprite.length : cols())
+        : Math.floor(Math.random() * cols()),
+      y,
+      vx: goingRight ? 1 : -1,
+      sprite,
+      color: fishColors[Math.floor(Math.random() * fishColors.length)],
+      slow: Math.random() < 0.4,
+    };
+  };
+
+  const fishCount = Math.max(5, Math.min(10, Math.floor(rows() / 3)));
+  const fish: Fish[] = Array.from({ length: fishCount }, () => spawnFish(false));
+  let bubbles: Bubble[] = [];
+  let tickNum = 0;
+
+  // Seaweed: column position + height, sways with the tick
+  const weedCount = Math.max(2, Math.floor(cols() / 14));
+  const weeds = Array.from({ length: weedCount }, () => ({
+    x: 2 + Math.floor(Math.random() * Math.max(1, cols() - 4)),
+    h: 3 + Math.floor(Math.random() * 3),
+  }));
+
+  term.write('\x1b[?25l');
+
+  const drawClipped = (row: number, x: number, text: string, color: string): string => {
+    const C = cols();
+    let start = 0;
+    let col = x;
+    if (col < 0) { start = -col; col = 0; }
+    const visible = text.slice(start, start + Math.max(0, C - col));
+    if (!visible) return '';
+    return `\x1b[${row + 1};${col + 1}H${color}${visible}${ANSI.reset}`;
+  };
+
+  const interval = setInterval(() => {
+    tickNum++;
+    let buf = '\x1b[2J';
+
+    // Water surface
+    const wave = tickNum % 2 === 0 ? '~  ~ ~~  ~ ' : ' ~ ~~  ~ ~ ';
+    buf += `\x1b[${waterRow};1H${ANSI.cyan}${wave.repeat(Math.ceil(cols() / wave.length)).slice(0, cols())}${ANSI.reset}`;
+
+    // Seaweed (kept off the bottom row, which belongs to the footer)
+    for (const w of weeds) {
+      for (let s = 0; s < w.h; s++) {
+        const ch = (tickNum + s) % 2 === 0 ? '(' : ')';
+        buf += `\x1b[${rows() - 1 - s};${w.x}H${ANSI.green}${ch}${ANSI.reset}`;
+      }
+    }
+
+    // Fish
+    for (let i = 0; i < fish.length; i++) {
+      const f = fish[i];
+      if (!f.slow || tickNum % 2 === 0) {
+        f.x += f.vx;
+      }
+      if ((f.vx > 0 && f.x > cols()) || (f.vx < 0 && f.x < -f.sprite.length)) {
+        fish[i] = spawnFish(true);
+        continue;
+      }
+      // Occasionally exhale
+      if (Math.random() < 0.03) {
+        bubbles.push({ x: f.vx > 0 ? f.x + f.sprite.length - 1 : f.x, y: f.y - 1 });
+      }
+      buf += drawClipped(f.y, Math.round(f.x), f.sprite, f.color);
+    }
+
+    // Bubbles rise and pop at the surface
+    bubbles = bubbles.filter(b => b.y > waterRow);
+    for (const b of bubbles) {
+      if (tickNum % 2 === 0) b.y--;
+      if (b.y > waterRow && b.x >= 0 && b.x < cols()) {
+        buf += `\x1b[${b.y + 1};${b.x + 1}H${ANSI.brightCyan}${b.y % 3 === 0 ? 'O' : 'o'}${ANSI.reset}`;
+      }
+    }
+
+    // Footer
+    buf += `\x1b[${rows()};1H${ANSI.dim} q to drain the tank${ANSI.reset}`;
+    term.write(buf);
+  }, 140);
+
+  const exitAquarium = () => {
+    clearInterval(interval);
+    setInteractiveMode(null);
+    term.write('\x1b[2J\x1b[H\x1b[?25h');
+    term.writeln(`${ANSI.dim}(Tank drained. The fish will miss you.)${ANSI.reset}`);
+    resetInput();
+    writePrompt();
+  };
+
+  setInteractiveMode((data: string) => {
+    const code = data.charCodeAt(0);
+    if (data === 'q' || data === 'Q' || code === 3 || (code === 27 && data.length === 1)) {
+      exitAquarium();
     }
   });
 }

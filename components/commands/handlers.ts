@@ -4,8 +4,8 @@
  */
 
 import { fileSystem } from '@/lib/filesystem';
-import { ANSI, PromptColors, padEndVisible } from '@/lib/filesystem/types';
-import { rootDirectory, fakeCommits, NODE_VERSION } from '@/lib/filesystem/data';
+import { ANSI, PromptColors, padEndVisible, visibleLength, stripAnsi } from '@/lib/filesystem/types';
+import { fakeCommits, NODE_VERSION } from '@/lib/filesystem/data';
 import { DirectoryNode, FileNode } from '@/lib/filesystem/types';
 
 // Track last command exit status
@@ -20,10 +20,13 @@ export function getExitCode(): number {
 }
 
 // Prompt info line (path, branch, node version)
-export function generatePromptInfo(): string {
+export function generatePromptInfo(compact = false): string {
   const currentPath = fileSystem.getCurrentPath();
   const gitBranch = 'main';
   const errorIndicator = lastExitCode !== 0 ? `${PromptColors.error}✘ ${PromptColors.reset}` : '';
+  if (compact) {
+    return `${errorIndicator}${PromptColors.directory}${currentPath}${PromptColors.reset} ${PromptColors.gitBranch}${gitBranch}${PromptColors.reset}`;
+  }
   return `${errorIndicator}${PromptColors.directory}${currentPath}${PromptColors.reset} ${PromptColors.gitBranch}on ${gitBranch}${PromptColors.reset} ${PromptColors.nodeVersion}via ⬢ ${NODE_VERSION}${PromptColors.reset}`;
 }
 
@@ -78,6 +81,10 @@ const COMMAND_REGISTRY: Record<string, CommandEntry> = {
   todo:        { category: 'Tools', description: 'Personal todo list' },
   alias:       { category: 'Tools', description: 'Define command aliases' },
   jobs:        { category: 'Tools', description: 'List background jobs' },
+  fortune:     { category: 'Tools', description: 'Print a random fortune' },
+  figlet:      { category: 'Tools', description: 'ASCII art banner text' },
+  weather:     { category: 'Tools', description: 'Live weather report' },
+  snake:       { category: 'Tools', description: 'Play snake' },
 
   // Hidden — completable but not in help
   gs:          { category: 'hidden' },
@@ -110,6 +117,16 @@ const COMMAND_REGISTRY: Record<string, CommandEntry> = {
   unalias:     { category: 'hidden' },
   fg:          { category: 'hidden' },
   bg:          { category: 'hidden' },
+  matrix:      { category: 'hidden' },
+  cmatrix:     { category: 'hidden' },
+  wine:        { category: 'hidden' },
+  momo:        { category: 'hidden' },
+  lolcat:      { category: 'hidden' },
+  yes:         { category: 'hidden' },
+  asciiquarium: { category: 'hidden' },
+  aquarium:    { category: 'hidden' },
+  konami:      { category: 'hidden' },
+  screensaver: { category: 'hidden' },
 };
 
 // Derived sets — no separate lists to maintain
@@ -117,17 +134,43 @@ const BUILTIN_COMMANDS = new Set(Object.keys(COMMAND_REGISTRY));
 const COMPLETABLE_COMMANDS = Object.keys(COMMAND_REGISTRY);
 
 // Help command — generated from the registry
-export function helpCommand(): string {
+export function wrapWords(text: string, width: number): string[] {
+  if (width <= 0 || text.length <= width) return [text];
+  const lines: string[] = [];
+  let line = '';
+
+  for (const word of text.split(' ')) {
+    if (!line) {
+      line = word;
+    } else if (line.length + word.length + 1 <= width) {
+      line += ` ${word}`;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  }
+
+  if (line) lines.push(line);
+  return lines;
+}
+
+export function helpCommand(cols = 80): string {
   const categories = ['Navigation', 'Portfolio', 'Tools'] as const;
   const sections = categories.map(cat => {
+    const descriptionWidth = Math.max(18, cols - 17);
     const cmds = Object.entries(COMMAND_REGISTRY)
       .filter(([, e]) => e.category === cat && e.description)
-      .map(([name, e]) => `  ${ANSI.green}${name.padEnd(12)}${ANSI.reset}- ${e.description}`)
+      .map(([name, e]) => {
+        const [first, ...rest] = wrapWords(e.description ?? '', descriptionWidth);
+        const wrapped = rest.map(line => `  ${' '.repeat(13)}  ${line}`).join('\n');
+        return `  ${ANSI.green}${name.padEnd(12)}${ANSI.reset}- ${first}${wrapped ? `\n${wrapped}` : ''}`;
+      })
       .join('\n');
     return `  ${ANSI.cyan}${cat}${ANSI.reset}\n${cmds}`;
   });
 
-  return `${ANSI.bold}Available commands:${ANSI.reset}\n\n${sections.join('\n\n')}\n\n${ANSI.dim}Tip: Use Tab for autocomplete, try ${ANSI.reset}${ANSI.green}sl${ANSI.reset}${ANSI.dim} for a surprise${ANSI.reset}`;
+  const tip = wrapWords('Tip: Use Tab for autocomplete, try sl or fortune | cowsay', Math.max(24, cols - 2)).join('\n');
+  return `${ANSI.bold}Available commands:${ANSI.reset}\n\n${sections.join('\n\n')}\n\n${ANSI.dim}${tip.replace('sl', `${ANSI.reset}${ANSI.green}sl${ANSI.reset}${ANSI.dim}`)}${ANSI.reset}`;
 }
 
 // LS command with flags
@@ -639,10 +682,11 @@ export function neofetchCommand(loadTime: number, cols: number): string {
   return lines.join('\n');
 }
 
-// Cowsay command
-export function cowsayCommand(args: string[]): string {
+// Cowsay command — wraps long messages like the real thing
+export function cowsayCommand(args: string[], cols = 80): string {
   const message = args.join(' ') || 'Moo!';
-  const lines = message.split('\n');
+  const width = Math.max(10, Math.min(40, cols - 8));
+  const lines = message.split('\n').flatMap(l => wrapWords(l, width));
   const maxLen = Math.max(...lines.map(l => l.length));
   const border = '─'.repeat(maxLen + 2);
 
@@ -658,6 +702,178 @@ export function cowsayCommand(args: string[]): string {
   output += `                ||     ||\n`;
 
   return output;
+}
+
+// Fortune command — random fortunes, pipeable into cowsay
+const fortunes = [
+  'There are only two hard things in computer science:\ncache invalidation, naming things,\nand off-by-one errors.',
+  'A good wine and a green test suite:\nboth improve with patience.',
+  'It works on my machine.\n(This terminal IS my machine, so... it works.)',
+  'Weeks of coding can save you\nhours of planning.',
+  'In vino veritas.\nIn git blame, also veritas.',
+  'The best error message is the one\nthat never shows up.',
+  'A SQL query walks into a bar, walks up to\ntwo tables and asks: "Can I JOIN you?"',
+  'Real programmers count from 0.\nReal sommeliers decant from 1982.',
+  'Documentation is like wine storage:\neveryone agrees it matters,\nfew do it properly.',
+  'There is no place like 127.0.0.1',
+  'Simplicity is the ultimate sophistication.\n  -- also applies to Chablis',
+  'First, solve the problem.\nThen, write the code.',
+  'A ship in harbor is safe,\nbut that is not what ships are built for.\nDeploy on Friday. (Do not deploy on Friday.)',
+  'You will inherit a legacy codebase.\nIt will build character. And nothing else.',
+  'The cork always smells like the cork.',
+  'Today is a good day to touch grass.\nThe terminal will still be here.',
+  'Vim users never quit.\nMostly because they cannot figure out how.',
+  'Your future contains many merge conflicts,\nbut all of them resolvable.',
+];
+
+export function getFortune(): string {
+  return fortunes[Math.floor(Math.random() * fortunes.length)];
+}
+
+export function fortuneCommand(cols = 80): string {
+  const wrapped = getFortune()
+    .split('\n')
+    .flatMap(l => wrapWords(l, Math.max(20, cols - 2)))
+    .join('\n');
+  return `${ANSI.italic}${wrapped}${ANSI.reset}`;
+}
+
+// Lolcat — rainbow-colorize text (strips existing colors first, like the real one)
+export function lolcat(text: string): string {
+  const seed = Math.random() * 256;
+  const freq = 0.18;
+  return stripAnsi(text)
+    .split('\n')
+    .map((line, row) => {
+      let out = '';
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === ' ') { out += ch; continue; }
+        const pos = seed + i + row * 4;
+        const red = Math.round(Math.sin(freq * pos) * 100 + 140);
+        const grn = Math.round(Math.sin(freq * pos + (2 * Math.PI) / 3) * 100 + 140);
+        const blu = Math.round(Math.sin(freq * pos + (4 * Math.PI) / 3) * 100 + 140);
+        out += `\x1b[38;2;${red};${grn};${blu}m${ch}`;
+      }
+      return out + ANSI.reset;
+    })
+    .join('\n');
+}
+
+// Momo — the cat. Mentioned in about/interests.txt; rewarded if you find her.
+export function momoCommand(args: string[]): string {
+  const r = ANSI.reset;
+  const cat = (art: string[], color: string) => art.map(l => `${color}${l}${r}`).join('\n');
+
+  const sitting = cat([
+    '  /\\_/\\ ',
+    ' ( o.o )',
+    '  > ^ < ',
+  ], ANSI.yellow);
+  const loaf = cat([
+    '  |\\---/|',
+    '  | o_o |',
+    '   \\_^_/ ',
+  ], ANSI.yellow);
+  const sleeping = cat([
+    '      |\\      _,,,---,,_',
+    'zzz   /,`.-\'`\'    -.  ;-;;,_',
+    '     |,4-  ) )-,_..;\\ (  `\'-\'',
+    '    \'---\'\'(_/--\'  `-\'\\_)',
+  ], ANSI.yellow);
+  const playful = cat([
+    '  /\\_/\\ ',
+    ' ( ^.^ )',
+    '  > ^ <  ~knocks your prompt off the table~',
+  ], ANSI.yellow);
+
+  if (args[0] === 'pet') {
+    return `${sitting}\n\n${ANSI.magenta}*purrrrrrrrrrrrr*${r} ${ANSI.dim}(+10 morale)${r}`;
+  }
+  if (args[0] === 'feed') {
+    return `${loaf}\n\n${ANSI.green}Momo accepts your offering.${r} ${ANSI.dim}She will forget this kindness within the hour.${r}`;
+  }
+
+  const moods = [
+    { art: sitting, msg: `${ANSI.dim}Momo stares at you. You blink first.${r}` },
+    { art: sleeping, msg: `${ANSI.dim}Momo is asleep on the warm part of the keyboard. asdfghjkl${r}` },
+    { art: loaf, msg: `${ANSI.dim}Momo has assumed loaf formation. Do not disturb.${r}` },
+    { art: playful, msg: `${ANSI.dim}rm: cannot remove 'prompt': knocked off table by cat${r}` },
+    { art: sitting, msg: `${ANSI.magenta}mrrp.${r}` },
+  ];
+  const mood = moods[Math.floor(Math.random() * moods.length)];
+  return `${mood.art}\n\n${mood.msg}\n\n${ANSI.dim}try: momo pet · momo feed${r}`;
+}
+
+// Figlet command — box-drawing banner font (Calvin S style, 3 rows per glyph)
+const figletFont: Record<string, [string, string, string]> = {
+  A: ['╔═╗', '╠═╣', '╩ ╩'], B: ['╔╗ ', '╠╩╗', '╚═╝'], C: ['╔═╗', '║  ', '╚═╝'],
+  D: ['╔╦╗', ' ║║', '═╩╝'], E: ['╔═╗', '║╣ ', '╚═╝'], F: ['╔═╗', '╠╣ ', '╚  '],
+  G: ['╔═╗', '║ ╦', '╚═╝'], H: ['╦ ╦', '╠═╣', '╩ ╩'], I: ['╦', '║', '╩'],
+  J: [' ╦', ' ║', '╚╝'], K: ['╦╔═', '╠╩╗', '╩ ╩'], L: ['╦  ', '║  ', '╩═╝'],
+  M: ['╔╦╗', '║║║', '╩ ╩'], N: ['╔╗╔', '║║║', '╝╚╝'], O: ['╔═╗', '║ ║', '╚═╝'],
+  P: ['╔═╗', '╠═╝', '╩  '], Q: ['╔═╗ ', '║═╬╗', '╚═╝╚'], R: ['╦═╗', '╠╦╝', '╩╚═'],
+  S: ['╔═╗', '╚═╗', '╚═╝'], T: ['╔╦╗', ' ║ ', ' ╩ '], U: ['╦ ╦', '║ ║', '╚═╝'],
+  V: ['╦  ╦', '╚╗╔╝', ' ╚╝ '], W: ['╦ ╦', '║║║', '╚╩╝'], X: ['═╗ ╦', '╔╩╦╝', '╩ ╚═'],
+  Y: ['╦ ╦', '╚╦╝', ' ╩ '], Z: ['╔═╗', '╔═╝', '╚═╝'],
+  '0': ['╔═╗', '║ ║', '╚═╝'], '1': ['╗', '║', '╩'], '2': ['╔═╗', '╔═╝', '╚══'],
+  '3': ['╔═╗', ' ═╣', '╚═╝'], '4': ['╦ ╦', '╚═╣', '  ╩'], '5': ['╔══', '╚═╗', '╚═╝'],
+  '6': ['╔═╗', '╠═╗', '╚═╝'], '7': ['══╗', ' ╔╝', ' ║ '], '8': ['╔═╗', '╠═╣', '╚═╝'],
+  '9': ['╔═╗', '╚═╣', '╚═╝'],
+  ' ': [' ', ' ', ' '], '!': ['║', '║', '▪'], '?': ['╔═╗', ' ╔╝', ' ▪ '],
+  '-': ['   ', '═══', '   '], '.': [' ', ' ', '▪'],
+};
+
+export function figletCommand(args: string[], cols = 80): string {
+  const text = args.join(' ');
+  if (!text) {
+    return `${ANSI.red}usage: figlet <text>${ANSI.reset}`;
+  }
+
+  const rows = ['', '', ''];
+  for (const ch of text.toUpperCase()) {
+    const glyph = figletFont[ch];
+    if (!glyph) continue;
+    // Stop before overflowing the terminal width
+    if (visibleLength(rows[0]) + glyph[0].length + 1 > cols) break;
+    for (let i = 0; i < 3; i++) {
+      rows[i] += glyph[i] + ' ';
+    }
+  }
+
+  if (!rows[0]) {
+    return `${ANSI.dim}figlet: no printable characters${ANSI.reset}`;
+  }
+  return `${ANSI.cyan}${rows.join('\n')}${ANSI.reset}`;
+}
+
+// Wine command — the emulator joke, but make it sommelier
+export function wineCommand(args: string[], cols = 80): string {
+  const w = Math.max(24, cols - 2);
+  if (args.length > 0) {
+    return `${ANSI.red}wine: cannot find '${args.join(' ')}'${ANSI.reset}
+${ANSI.dim}${wrapWords('(This machine only runs fine wine, not Windows binaries.)', w).join('\n')}${ANSI.reset}`;
+  }
+
+  const wines = [
+    { name: 'Château Margaux 2015', region: 'Bordeaux, France', note: 'cassis, violets, and impeccable git hygiene' },
+    { name: 'Domaine Leflaive Puligny-Montrachet 2020', region: 'Burgundy, France', note: 'citrus, hazelnut, and zero runtime errors' },
+    { name: 'Barolo Monfortino 2010', region: 'Piedmont, Italy', note: 'tar, roses, and long-term support' },
+    { name: 'Ridge Monte Bello 2018', region: 'Santa Cruz Mountains, CA', note: 'dark fruit, graphite, and clean abstractions' },
+    { name: 'Egon Müller Scharzhofberger Kabinett 2021', region: 'Mosel, Germany', note: 'lime, slate, and perfectly balanced YAML' },
+    { name: 'Krug Grande Cuvée', region: 'Champagne, France', note: 'brioche, citrus, and a successful production deploy' },
+  ];
+  const pick = wines[Math.floor(Math.random() * wines.length)];
+
+  return `${ANSI.dim}${wrapWords("wine: this isn't an emulator. But since you asked...", w).join('\n')}${ANSI.reset}
+
+🍷 ${ANSI.bold}${ANSI.magenta}Tonight's pour${ANSI.reset}
+${ANSI.dim}${'━'.repeat(Math.min(40, w))}${ANSI.reset}
+${wrapWords(pick.name, w - 2).map(l => `  ${ANSI.bold}${l}${ANSI.reset}`).join('\n')}
+  ${ANSI.cyan}${pick.region}${ANSI.reset}
+${wrapWords(`Notes of ${pick.note}.`, w - 2).map(l => `  ${ANSI.italic}${l}${ANSI.reset}`).join('\n')}
+
+${ANSI.dim}${wrapWords('Curated by the Director of Technology, Manhattan Wine Company.', w).join('\n')}${ANSI.reset}`;
 }
 
 // Echo command
@@ -812,120 +1028,6 @@ export function openCommand(args: string[]): { output: string; url?: string } {
   }
 
   return { output: `${ANSI.dim}No URL found in ${target}${ANSI.reset}` };
-}
-
-// AI coding tool easter eggs
-const ORANGE = '\x1b[38;5;208m';
-
-export function claudeCommand(cols: number): string {
-  const W = Math.max(60, cols - 2); // full width minus outer padding
-  const LW = Math.min(34, Math.floor(W * 0.4));
-  const RW = W - LW - 1; // -1 for middle divider
-  const o = ORANGE;
-  const r = ANSI.reset;
-  const row = (left: string, right: string) =>
-    `${o}│${r}${padEndVisible(left, LW)}${o}│${r}${padEndVisible(right, RW)}${o}│${r}`;
-
-  const titleText = '─── Claude Code v2.1.39 ';
-  const topFill = Math.max(0, W - titleText.length - 1);
-
-  return [
-    '',
-    `${o}╭${titleText}${'─'.repeat(topFill)}╮${r}`,
-    row('', ` ${ANSI.bold}Tips for getting started${r}`),
-    row(`      ${ANSI.bold}Welcome back, Otis!${r}`, ` Run ${ANSI.cyan}/init${r} to create a CLAUDE.md file`),
-    row('', ` with instructions for Claude`),
-    row('', ` ${ANSI.dim}${'─'.repeat(RW - 2)}${r}`),
-    row(`${' '.repeat(Math.max(0, Math.floor((LW - 7) / 2)))}${ANSI.magenta}▐▛███▜▌${r}`, ` ${ANSI.dim}Recent activity${r}`),
-    row(`${' '.repeat(Math.max(0, Math.floor((LW - 9) / 2)))}${ANSI.magenta}▝▜█████▛▘${r}`, ` ${ANSI.dim}No recent activity${r}`),
-    row(`${' '.repeat(Math.max(0, Math.floor((LW - 6) / 2)))}${ANSI.magenta}▘▘ ▝▝${r}`, ''),
-    row(`${' '.repeat(Math.max(0, Math.floor((LW - 21) / 2)))}${ANSI.dim}Opus 4.6 · Claude Max${r}`, ''),
-    row(`${' '.repeat(Math.max(0, Math.floor((LW - 23) / 2)))}${ANSI.dim}~/Projects/otisscott.me${r}`, ''),
-    `${o}╰${'─'.repeat(W)}╯${r}`,
-  ].join('\n');
-}
-
-export function codexCommand(cols: number): string {
-  const d = ANSI.dim;
-  const r = ANSI.reset;
-  const W = Math.max(40, Math.min(58, cols - 4));
-
-  const row = (content: string) =>
-    `${d}│${r} ${padEndVisible(content, W)}${d} │${r}`;
-
-  const titleText = '── ';
-  const topFill = Math.max(0, W + 2 - titleText.length);
-
-  return [
-    '',
-    `${d}╭${titleText}${'─'.repeat(topFill)}╮${r}`,
-    row(`${d}>_${r} ${ANSI.bold}OpenAI Codex${r} ${d}(v0.1.2503262313)${r}`),
-    row(''),
-    row(`${d}model:     ${r}gpt-5.3-codex-high   ${d}/model${ANSI.cyan} to change${r}`),
-    row(`${d}directory: ${r}~/Projects/otisscott.me`),
-    `${d}╰${'─'.repeat(W + 2)}╯${r}`,
-  ].join('\n');
-}
-
-export function opencodeCommand(cols: number): string {
-  const d = ANSI.dim;
-  const r = ANSI.reset;
-  const gray = '\x1b[90m';
-  const shadow1 = '\x1b[38;5;235m';
-  const bg1 = '\x1b[48;5;235m';
-  const shadow2 = '\x1b[38;5;238m';
-  const bg2 = '\x1b[48;5;238m';
-
-  // Render the "open code" logo with shadow effects
-  // _ = shadow bg space, ^ = fg char + shadow bg ▀, ~ = shadow fg ▀
-  const logoLeft = [
-    '                   ',
-    '█▀▀█ █▀▀█ █▀▀█ █▀▀▄',
-    '█__█ █__█ █^^^ █__█',
-    '▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀',
-  ];
-  const logoRight = [
-    '             ▄     ',
-    '█▀▀▀ █▀▀█ █▀▀█ █▀▀█',
-    '█___ █__█ █__█ █^^^',
-    '▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀',
-  ];
-
-  const drawLine = (line: string, fg: string, shadow: string, bg: string) => {
-    let out = '';
-    for (const ch of line) {
-      if (ch === '_') { out += `${bg} ${r}`; continue; }
-      if (ch === '^') { out += `${fg}${bg}▀${r}`; continue; }
-      if (ch === '~') { out += `${shadow}▀${r}`; continue; }
-      if (ch === ' ') { out += ' '; continue; }
-      out += `${fg}${ch}${r}`;
-    }
-    return out;
-  };
-
-  const logoLines: string[] = [];
-  for (let i = 0; i < logoLeft.length; i++) {
-    const left = drawLine(logoLeft[i], gray, shadow1, bg1);
-    const right = drawLine(logoRight[i], r, shadow2, bg2);
-    logoLines.push(left + ' ' + right);
-  }
-
-  // Center the logo
-  const logoVisibleWidth = 41; // "open" (20) + gap (1) + "code" (20)
-  const pad = Math.max(0, Math.floor((cols - logoVisibleWidth) / 2));
-  const padStr = ' '.repeat(pad);
-
-  // Status bar
-  const dir = '~/Projects/otisscott.me';
-  const ver = 'v0.2.22';
-  const statusGap = Math.max(1, cols - dir.length - ver.length - 4);
-
-  return [
-    '',
-    ...logoLines.map(l => padStr + l),
-    '',
-    `${d}  ${dir}${' '.repeat(statusGap)}${ver}${r}`,
-  ].join('\n');
 }
 
 // Uptime command

@@ -433,4 +433,120 @@ ${ANSI.bold}DESCRIPTION${ANSI.reset}
 ${ANSI.bold}EXAMPLES${ANSI.reset}
     man ls
     man cowsay`,
+  fortune: `${ANSI.bold}NAME${ANSI.reset}
+    fortune - print a random, hopefully interesting, adage
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    fortune
+    fortune | cowsay
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Print a random fortune. Wisdom quality not guaranteed. Pairs well
+    with cowsay, like a good Burgundy with roast chicken.
+
+${ANSI.bold}EXAMPLES${ANSI.reset}
+    fortune
+    fortune | cowsay`,
+  figlet: `${ANSI.bold}NAME${ANSI.reset}
+    figlet - display large characters made up of ordinary screen characters
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    figlet <text>
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Render text as a large ASCII art banner. Supports letters, numbers,
+    and basic punctuation. Output truncates to fit your terminal.
+
+${ANSI.bold}EXAMPLES${ANSI.reset}
+    figlet hello
+    figlet otis`,
+  weather: `${ANSI.bold}NAME${ANSI.reset}
+    weather - terminal weather report
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    weather [city]
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Show live current conditions with ASCII art, courtesy of the
+    Open-Meteo API. Defaults to New York City, where the wine is stored.
+
+${ANSI.bold}EXAMPLES${ANSI.reset}
+    weather
+    weather tokyo
+    weather "san francisco"`,
+  snake: `${ANSI.bold}NAME${ANSI.reset}
+    snake - the classic, in your browser's terminal
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    snake
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Steer the snake with arrow keys, WASD, or hjkl (we see you, vim
+    users). Eat the food, don't eat yourself. High score is saved
+    locally.
+
+${ANSI.bold}CONTROLS${ANSI.reset}
+    arrows/wasd/hjkl    move
+    r                   restart after game over
+    q or Ctrl+C         quit`,
+  matrix: `${ANSI.bold}NAME${ANSI.reset}
+    matrix - follow the white rabbit
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    matrix
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    There is no spoon. Press q to take the blue pill.`,
+  wine: `${ANSI.bold}NAME${ANSI.reset}
+    wine - run Windows applications
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    wine [program]
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    On most systems, wine runs Windows binaries. On otisscott.me, it
+    consults the Director of Technology of a Manhattan wine company,
+    which is frankly the better deal.`,
+  momo: `${ANSI.bold}NAME${ANSI.reset}
+    momo - the cat
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    momo [pet|feed]
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Summon Momo. She may purr, sleep, loaf, or knock your prompt off
+    the table. Behavior is non-deterministic, as is tradition.
+
+${ANSI.bold}SEE ALSO${ANSI.reset}
+    about/interests.txt`,
+  lolcat: `${ANSI.bold}NAME${ANSI.reset}
+    lolcat - rainbows and unicorns!
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    <command> | lolcat
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Concatenate and rainbow-colorize. Works on anything pipeable.
+
+${ANSI.bold}EXAMPLES${ANSI.reset}
+    figlet otis | lolcat
+    fortune | cowsay | lolcat`,
+  yes: `${ANSI.bold}NAME${ANSI.reset}
+    yes - output a string repeatedly until killed
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    yes [string]
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Repeatedly output y, or the given string, until interrupted with
+    Ctrl+C. Useful for agreeing with things at scale.`,
+  asciiquarium: `${ANSI.bold}NAME${ANSI.reset}
+    asciiquarium - an aquarium in your terminal
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    asciiquarium
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Fish, bubbles, seaweed. No feeding required. Press q to drain
+    the tank.`,
 };

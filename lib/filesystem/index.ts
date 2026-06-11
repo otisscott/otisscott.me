@@ -3,7 +3,7 @@
  * Helper functions for navigating and interacting with the virtual filesystem
  */
 
-import { DirectoryNode, FileNode, FileSystemNode, ANSI } from './types';
+import { DirectoryNode, FileSystemNode, ANSI } from './types';
 import { rootDirectory } from './data';
 
 export class FileSystem {
@@ -118,7 +118,7 @@ export class FileSystem {
     }
 
     if (options.tree) {
-      return this.renderTree(targetDir, '', true);
+      return this.renderTree(targetDir, '');
     }
 
     const entries = Array.from(targetDir.children.entries());
@@ -157,7 +157,7 @@ export class FileSystem {
       .join('  ');
   }
 
-  private renderTree(dir: DirectoryNode, prefix: string, isLast: boolean): string {
+  private renderTree(dir: DirectoryNode, prefix: string): string {
     const entries = Array.from(dir.children.entries());
     let result = '';
 
@@ -169,7 +169,7 @@ export class FileSystem {
 
       if (node.type === 'directory') {
         const newPrefix = prefix + (isLastEntry ? '    ' : '│   ');
-        result += this.renderTree(node, newPrefix, isLastEntry);
+        result += this.renderTree(node, newPrefix);
       }
     });
 
