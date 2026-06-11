@@ -29,6 +29,7 @@
 .claude/
 .tldr/
 .tldrignore
+.playwright-mcp/
 
 # personal data
 linkedin.md
