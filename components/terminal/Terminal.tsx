@@ -1,13 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useLayoutEffect } from 'react';
-import {
-  init as initGhostty,
-  Terminal as XTerm,
-  FitAddon,
-  UrlRegexProvider,
-  OSC8LinkProvider,
-} from 'ghostty-web';
+import { init as initGhostty, Terminal as XTerm, FitAddon } from 'ghostty-web';
 import { themes, ColorMode } from '@/lib/theme/themes';
 import {
   generatePromptInfo,
@@ -368,12 +362,10 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
       fitAddonRef.current = fitAddon;
       term.loadAddon(fitAddon);
 
-      // Open terminal (ghostty-web renders to its own canvas — no WebGL addon)
+      // Open terminal (ghostty-web renders to its own canvas — no WebGL addon).
+      // open() registers the OSC 8 and bare-URL link providers itself, so
+      // there is nothing to add here; ctrl/cmd-click activates them.
       term.open(wrapper);
-
-      // Link detection: OSC 8 hyperlinks plus bare URLs
-      term.registerLinkProvider(new OSC8LinkProvider(term));
-      term.registerLinkProvider(new UrlRegexProvider(term));
 
       // Load aliases from localStorage
       aliasesRef.current = loadAliases();
