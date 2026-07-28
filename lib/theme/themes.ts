@@ -1,6 +1,7 @@
 /**
  * Terminal Color Themes
- * Each theme provides dark and light variants with xterm.js colors and CSS variable overrides
+ * Each theme provides dark and light variants with terminal colors and CSS variable overrides.
+ * The `xterm` key keeps its name because ghostty-web takes the same ITheme shape.
  */
 
 export interface ThemeVariant {

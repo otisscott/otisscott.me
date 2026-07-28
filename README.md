@@ -1,12 +1,12 @@
 # otisscott.me
 
-A terminal-emulated personal website built with Next.js, TypeScript, and xterm.js. Features a fully functional terminal interface with 40+ commands, multiple themes, and easter eggs.
+A terminal-emulated personal website built with Next.js, TypeScript, and libghostty. Features a fully functional terminal interface with 40+ commands, multiple themes, and easter eggs.
 
 ![Terminal Portfolio](screenshots/readme-hero.png)
 
 ## Features
 
-- **Full Terminal Emulation** — xterm.js with WebGL rendering
+- **Real Terminal Emulation** — Ghostty's own VT parser, compiled to WASM
 - **40+ Commands** — navigation, portfolio, dev tools, easter eggs
 - **Multiple Themes** — Tokyo Night, Dracula, Nord, and more (light/dark auto-detection)
 - **Pure Prompt** — git-aware prompt with branch and Node version
@@ -19,7 +19,7 @@ A terminal-emulated personal website built with Next.js, TypeScript, and xterm.j
 
 - **Framework**: Next.js 16 (App Router, Turbopack)
 - **Language**: TypeScript
-- **Terminal**: xterm.js with FitAddon, WebLinksAddon, WebglAddon
+- **Terminal**: [ghostty-web](https://github.com/coder/ghostty-web) — libghostty compiled to WASM, with FitAddon and OSC 8 / URL link providers
 - **Styling**: CSS Modules + Global CSS
 - **Deployment**: Vercel
 
@@ -99,7 +99,7 @@ app/
 
 components/
 ├── terminal/
-│   └── Terminal.tsx        # xterm setup, key handling, shell (pipes, jobs, aliases)
+│   └── Terminal.tsx        # terminal setup, key handling, shell (pipes, jobs, aliases)
 └── commands/
     ├── dispatch.ts         # Command table — help, completion, and execution
     ├── handlers.ts         # Command implementations

@@ -356,10 +356,10 @@ until SEC rate limiting started causing IP bans.
 
 **This website!**
 
-A terminal-inspired portfolio built with Next.js and xterm.js.
+A terminal-inspired portfolio built with Next.js and libghostty.
 
 ## Features
-- Full terminal emulation with xterm.js
+- Real terminal emulation — Ghostty's VT parser, compiled to WASM
 - Virtual filesystem with navigation
 - Syntax highlighting for code files
 - Tokyo Night color theme
@@ -369,7 +369,7 @@ A terminal-inspired portfolio built with Next.js and xterm.js.
 - Next.js 16
 - React 19
 - TypeScript
-- xterm.js
+- ghostty-web (libghostty)
 
 🔗 github.com/otisscott/otisscott.me`),
     createFile('dotfiles.md', `# Dotfiles
@@ -457,7 +457,7 @@ Last updated: February 2026`),
 This site is built with:
 
 - **Next.js 16** - React framework
-- **xterm.js** - Terminal emulator
+- **ghostty-web** - Ghostty\'s VT engine, in WASM
 - **TypeScript** - Type safety
 - **Tokyo Night** - Color theme
 

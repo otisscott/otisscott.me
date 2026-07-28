@@ -1,10 +1,13 @@
 'use client';
 
 import { useRef, useCallback, useLayoutEffect } from 'react';
-import { Terminal as XTerm } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import { WebLinksAddon } from '@xterm/addon-web-links';
-import { WebglAddon } from '@xterm/addon-webgl';
+import {
+  init as initGhostty,
+  Terminal as XTerm,
+  FitAddon,
+  UrlRegexProvider,
+  OSC8LinkProvider,
+} from 'ghostty-web';
 import { themes, ColorMode } from '@/lib/theme/themes';
 import {
   generatePromptInfo,
@@ -30,7 +33,7 @@ import {
   TAKEOVER,
 } from '@/components/commands/dispatch';
 import type { CommandContext } from '@/components/commands/dispatch';
-import { startBgJob, startKonami, startScreensaver } from '@/components/commands/interactive';
+import { startBgJob, startKonami, startScreensaver, stopAllAnimations } from '@/components/commands/interactive';
 import { ANSI, padEndVisible, stripAnsi } from '@/lib/filesystem/types';
 
 interface TerminalProps {
@@ -332,297 +335,308 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
   useLayoutEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
 
-    const wrapper = terminalRef.current;
-    loadTimeRef.current = Date.now();
-    lastActivityRef.current = Date.now();
+    // ghostty-web loads its WASM module before a Terminal can be constructed,
+    // so setup is async and the effect can be torn down mid-load.
+    let cancelled = false;
+    let teardown: (() => void) | null = null;
 
-    // Detect system color scheme
-    const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const initialMode: ColorMode = darkQuery.matches ? 'dark' : 'light';
-    colorModeRef.current = initialMode;
-    const initialVariant = themes['tokyo-night'][initialMode];
-
-    const term = new XTerm({
-      theme: initialVariant.xterm,
-      fontFamily: '"SF Mono", "Fira Code", "JetBrains Mono", "Consolas", "Monaco", "Courier New", monospace',
-      fontSize: window.matchMedia('(max-width: 480px)').matches ? 12 : 14,
-      lineHeight: 1.25,
-      cursorBlink: true,
-      cursorStyle: 'block',
-      scrollback: 10000,
-      scrollOnUserInput: true,
-    });
-
-    // Set initial CSS vars
-    document.documentElement.style.setProperty('--bg-primary', initialVariant.css.bgPrimary);
-    document.documentElement.style.setProperty('--bg-secondary', initialVariant.css.bgSecondary);
-    document.documentElement.style.setProperty('--bg-tertiary', initialVariant.css.bgTertiary);
-
-    const fitAddon = new FitAddon();
-    fitAddonRef.current = fitAddon;
-    term.loadAddon(fitAddon);
-    term.loadAddon(new WebLinksAddon());
-
-    try {
-      term.loadAddon(new WebglAddon());
-    } catch {
-      // WebGL not supported
-    }
-
-    // Open terminal
-    term.open(wrapper);
-
-    // Load aliases from localStorage
-    aliasesRef.current = loadAliases();
-
-    // Write welcome message (adapts to terminal width)
-    const writeWelcome = () => {
-      const cols = term.cols;
-      term.writeln('');
-
-      if (cols >= 50) {
-        // Boxed welcome for wide screens
-        const W = Math.min(56, cols - 4);
-        const brow = (content: string) =>
-          `${ANSI.cyan}  |${ANSI.reset}${padEndVisible(content, W)}${ANSI.cyan}|${ANSI.reset}`;
-
-        term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
-        term.writeln(brow(''));
-        term.writeln(brow(`   Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset}`));
-        term.writeln(brow(''));
-        term.writeln(brow(`   Type ${ANSI.green}help${ANSI.reset} for commands`));
-        term.writeln(brow(`   Try ${ANSI.green}neofetch${ANSI.reset} or ${ANSI.green}cowsay${ANSI.reset}`));
-        term.writeln(brow(''));
-        term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
-      } else {
-        // Borderless welcome for narrow screens
-        term.writeln(` Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset}`);
-        term.writeln('');
-        term.writeln(` Type ${ANSI.green}help${ANSI.reset} for commands`);
-      }
-
-      term.write(getPromptInfo() + '\r\n' + generatePromptSymbol());
-      promptMultilineRef.current = true;
-    };
-
-    // Fit terminal using FitAddon (which properly measures char dimensions)
-    const fitTerminal = () => {
-      if (fitAddonRef.current && xtermRef.current) {
-        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-        document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
-        fitAddonRef.current.fit();
-        xtermRef.current.scrollToBottom();
-      }
-    };
-
-    // Initialize terminal after fonts load
-    const initTerminal = () => {
-      // Fit first so term.cols reflects actual screen width
-      fitTerminal();
-      // Then write welcome (adapts to cols)
-      writeWelcome();
-      // Scroll viewport to show the prompt at the bottom
-      setTimeout(() => {
-        const viewport = wrapper.querySelector('.xterm-viewport') as HTMLElement;
-        if (viewport) {
-          viewport.scrollTop = viewport.scrollHeight;
-        }
-        xtermRef.current?.scrollToBottom();
-      }, 0);
-    };
-
-    if (typeof document !== 'undefined' && document.fonts) {
-      document.fonts.ready.then(() => {
-        initTerminal();
-        // Refit after layout settles
-        setTimeout(fitTerminal, 100);
-      }).catch(() => {
-        initTerminal();
-      });
-    } else {
-      requestAnimationFrame(initTerminal);
-    }
-
-    const handleViewportResize = () => {
-      fitTerminal();
-    };
-
-    window.addEventListener('resize', handleViewportResize);
-    window.visualViewport?.addEventListener('resize', handleViewportResize);
-    window.visualViewport?.addEventListener('scroll', handleViewportResize);
-
-    const handleTerminalFocus = () => {
-      requestAnimationFrame(() => {
-        fitTerminal();
-        xtermRef.current?.scrollToBottom();
-      });
-    };
-    wrapper.addEventListener('focusin', handleTerminalFocus);
-
-    // Idle screensaver — only kicks in at an empty prompt
-    const IDLE_MS = 3 * 60 * 1000;
-    const idleInterval = window.setInterval(() => {
-      if (
-        Date.now() - (lastActivityRef.current ?? Date.now()) > IDLE_MS &&
-        !interactiveModeRef.current &&
-        inputBufferRef.current === ''
-      ) {
-        lastActivityRef.current = Date.now();
-        startScreensaver(getTerminalContext());
-      }
-    }, 10000);
-
-    // Listen for system color scheme changes
-    const handleColorSchemeChange = (e: MediaQueryListEvent) => {
-      const newMode: ColorMode = e.matches ? 'dark' : 'light';
-      colorModeRef.current = newMode;
-      applyTheme(currentThemeRef.current, newMode);
-    };
-    darkQuery.addEventListener('change', handleColorSchemeChange);
-
-    term.onData((data) => {
+    const setup = (wrapper: HTMLDivElement) => {
+      loadTimeRef.current = Date.now();
       lastActivityRef.current = Date.now();
 
-      // Interactive mode intercept (e.g., vim command buffer)
-      if (interactiveModeRef.current) {
-        interactiveModeRef.current(data);
-        return;
-      }
+      // Detect system color scheme
+      const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const initialMode: ColorMode = darkQuery.matches ? 'dark' : 'light';
+      colorModeRef.current = initialMode;
+      const initialVariant = themes['tokyo-night'][initialMode];
 
-      // Konami code detection — only at the shell prompt
-      const konamiToken =
-        data === '\x1b[A' ? 'U' :
-        data === '\x1b[B' ? 'D' :
-        data === '\x1b[C' ? 'R' :
-        data === '\x1b[D' ? 'L' :
-        data.length === 1 ? data.toLowerCase() : '?';
-      konamiRef.current.push(konamiToken);
-      if (konamiRef.current.length > 10) konamiRef.current.shift();
-      if (konamiRef.current.join('') === 'UUDDLRLRba') {
-        konamiRef.current = [];
-        startKonami(getTerminalContext());
-        return;
-      }
+      const term = new XTerm({
+        theme: initialVariant.xterm,
+        fontFamily: '"SF Mono", "Fira Code", "JetBrains Mono", "Consolas", "Monaco", "Courier New", monospace',
+        fontSize: window.matchMedia('(max-width: 480px)').matches ? 12 : 14,
+        cursorBlink: true,
+        cursorStyle: 'block',
+        scrollback: 10000,
+      });
 
-      const code = data.charCodeAt(0);
+      // Set initial CSS vars
+      document.documentElement.style.setProperty('--bg-primary', initialVariant.css.bgPrimary);
+      document.documentElement.style.setProperty('--bg-secondary', initialVariant.css.bgSecondary);
+      document.documentElement.style.setProperty('--bg-tertiary', initialVariant.css.bgTertiary);
 
-      // Save and clear ghost text before processing input
-      const hadGhost = ghostTextRef.current;
-      if (hadGhost) {
-        term.write('\x1b[K');
-        ghostTextRef.current = '';
-      }
+      const fitAddon = new FitAddon();
+      fitAddonRef.current = fitAddon;
+      term.loadAddon(fitAddon);
 
-      if (code === 13) {
-        handleCommand(inputBufferRef.current);
-      } else if (code === 127) {
-        if (cursorPositionRef.current > 0) {
-          const after = inputBufferRef.current.slice(cursorPositionRef.current);
-          inputBufferRef.current = inputBufferRef.current.slice(0, cursorPositionRef.current - 1) + after;
-          cursorPositionRef.current--;
-          term.write('\b' + after + ' ' + `\x1b[${after.length + 1}D`);
+      // Open terminal (ghostty-web renders to its own canvas — no WebGL addon)
+      term.open(wrapper);
+
+      // Link detection: OSC 8 hyperlinks plus bare URLs
+      term.registerLinkProvider(new OSC8LinkProvider(term));
+      term.registerLinkProvider(new UrlRegexProvider(term));
+
+      // Load aliases from localStorage
+      aliasesRef.current = loadAliases();
+
+      // Write welcome message (adapts to terminal width)
+      const writeWelcome = () => {
+        const cols = term.cols;
+        term.writeln('');
+
+        if (cols >= 50) {
+          // Boxed welcome for wide screens
+          const W = Math.min(56, cols - 4);
+          const brow = (content: string) =>
+            `${ANSI.cyan}  |${ANSI.reset}${padEndVisible(content, W)}${ANSI.cyan}|${ANSI.reset}`;
+
+          term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
+          term.writeln(brow(''));
+          term.writeln(brow(`   Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset}`));
+          term.writeln(brow(''));
+          term.writeln(brow(`   Type ${ANSI.green}help${ANSI.reset} for commands`));
+          term.writeln(brow(`   Try ${ANSI.green}neofetch${ANSI.reset} or ${ANSI.green}cowsay${ANSI.reset}`));
+          term.writeln(brow(''));
+          term.writeln(`${ANSI.cyan}  +${'-'.repeat(W)}+${ANSI.reset}`);
+        } else {
+          // Borderless welcome for narrow screens
+          term.writeln(` Welcome to ${ANSI.magenta}otisscott.me${ANSI.reset}`);
+          term.writeln('');
+          term.writeln(` Type ${ANSI.green}help${ANSI.reset} for commands`);
         }
-      } else if (code === 27 && data.length === 3) {
-        if (data === '\x1b[A') {
-          if (historyIndexRef.current > 0) {
-            historyIndexRef.current--;
-            const prevCommand = commandHistoryRef.current[historyIndexRef.current];
-            inputBufferRef.current = prevCommand;
-            cursorPositionRef.current = prevCommand.length;
-            term.write('\r\x1b[K');
-            promptMultilineRef.current = false;
-            writeShortPrompt();
-            term.write(prevCommand);
+
+        term.write(getPromptInfo() + '\r\n' + generatePromptSymbol());
+        promptMultilineRef.current = true;
+      };
+
+      // Fit terminal using FitAddon (which properly measures char dimensions)
+      const fitTerminal = () => {
+        if (fitAddonRef.current && xtermRef.current) {
+          const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+          document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
+          fitAddonRef.current.fit();
+          xtermRef.current.scrollToBottom();
+        }
+      };
+
+      // Initialize terminal after fonts load
+      const initTerminal = () => {
+        // Fit first so term.cols reflects actual screen width
+        fitTerminal();
+        // Then write welcome (adapts to cols)
+        writeWelcome();
+        // Scroll to show the prompt at the bottom once layout settles
+        setTimeout(() => xtermRef.current?.scrollToBottom(), 0);
+      };
+
+      if (typeof document !== 'undefined' && document.fonts) {
+        document.fonts.ready.then(() => {
+          initTerminal();
+          // Refit after layout settles
+          setTimeout(fitTerminal, 100);
+        }).catch(() => {
+          initTerminal();
+        });
+      } else {
+        requestAnimationFrame(initTerminal);
+      }
+
+      const handleViewportResize = () => {
+        fitTerminal();
+      };
+
+      window.addEventListener('resize', handleViewportResize);
+      window.visualViewport?.addEventListener('resize', handleViewportResize);
+      window.visualViewport?.addEventListener('scroll', handleViewportResize);
+
+      const handleTerminalFocus = () => {
+        requestAnimationFrame(() => {
+          fitTerminal();
+          xtermRef.current?.scrollToBottom();
+        });
+      };
+      wrapper.addEventListener('focusin', handleTerminalFocus);
+
+      // Idle screensaver — only kicks in at an empty prompt
+      const IDLE_MS = 3 * 60 * 1000;
+      const idleInterval = window.setInterval(() => {
+        if (
+          Date.now() - (lastActivityRef.current ?? Date.now()) > IDLE_MS &&
+          !interactiveModeRef.current &&
+          inputBufferRef.current === ''
+        ) {
+          lastActivityRef.current = Date.now();
+          startScreensaver(getTerminalContext());
+        }
+      }, 10000);
+
+      // Listen for system color scheme changes
+      const handleColorSchemeChange = (e: MediaQueryListEvent) => {
+        const newMode: ColorMode = e.matches ? 'dark' : 'light';
+        colorModeRef.current = newMode;
+        applyTheme(currentThemeRef.current, newMode);
+      };
+      darkQuery.addEventListener('change', handleColorSchemeChange);
+
+      term.onData((data) => {
+        lastActivityRef.current = Date.now();
+
+        // Interactive mode intercept (e.g., vim command buffer)
+        if (interactiveModeRef.current) {
+          interactiveModeRef.current(data);
+          return;
+        }
+
+        // Konami code detection — only at the shell prompt
+        const konamiToken =
+          data === '\x1b[A' ? 'U' :
+          data === '\x1b[B' ? 'D' :
+          data === '\x1b[C' ? 'R' :
+          data === '\x1b[D' ? 'L' :
+          data.length === 1 ? data.toLowerCase() : '?';
+        konamiRef.current.push(konamiToken);
+        if (konamiRef.current.length > 10) konamiRef.current.shift();
+        if (konamiRef.current.join('') === 'UUDDLRLRba') {
+          konamiRef.current = [];
+          startKonami(getTerminalContext());
+          return;
+        }
+
+        const code = data.charCodeAt(0);
+
+        // Save and clear ghost text before processing input
+        const hadGhost = ghostTextRef.current;
+        if (hadGhost) {
+          term.write('\x1b[K');
+          ghostTextRef.current = '';
+        }
+
+        if (code === 13) {
+          handleCommand(inputBufferRef.current);
+        } else if (code === 127) {
+          if (cursorPositionRef.current > 0) {
+            const after = inputBufferRef.current.slice(cursorPositionRef.current);
+            inputBufferRef.current = inputBufferRef.current.slice(0, cursorPositionRef.current - 1) + after;
+            cursorPositionRef.current--;
+            term.write('\b' + after + ' ' + `\x1b[${after.length + 1}D`);
           }
-        } else if (data === '\x1b[B') {
-          if (historyIndexRef.current < commandHistoryRef.current.length - 1) {
-            historyIndexRef.current++;
-            const nextCommand = commandHistoryRef.current[historyIndexRef.current];
-            inputBufferRef.current = nextCommand;
-            cursorPositionRef.current = nextCommand.length;
-            term.write('\r\x1b[K');
-            writeShortPrompt();
-            term.write(nextCommand);
-          } else {
-            historyIndexRef.current = commandHistoryRef.current.length;
-            inputBufferRef.current = '';
-            cursorPositionRef.current = 0;
-            term.write('\r\x1b[K');
-            writeShortPrompt();
+        } else if (code === 27 && data.length === 3) {
+          if (data === '\x1b[A') {
+            if (historyIndexRef.current > 0) {
+              historyIndexRef.current--;
+              const prevCommand = commandHistoryRef.current[historyIndexRef.current];
+              inputBufferRef.current = prevCommand;
+              cursorPositionRef.current = prevCommand.length;
+              term.write('\r\x1b[K');
+              promptMultilineRef.current = false;
+              writeShortPrompt();
+              term.write(prevCommand);
+            }
+          } else if (data === '\x1b[B') {
+            if (historyIndexRef.current < commandHistoryRef.current.length - 1) {
+              historyIndexRef.current++;
+              const nextCommand = commandHistoryRef.current[historyIndexRef.current];
+              inputBufferRef.current = nextCommand;
+              cursorPositionRef.current = nextCommand.length;
+              term.write('\r\x1b[K');
+              writeShortPrompt();
+              term.write(nextCommand);
+            } else {
+              historyIndexRef.current = commandHistoryRef.current.length;
+              inputBufferRef.current = '';
+              cursorPositionRef.current = 0;
+              term.write('\r\x1b[K');
+              writeShortPrompt();
+            }
+          } else if (data === '\x1b[C') {
+            if (cursorPositionRef.current >= inputBufferRef.current.length && hadGhost) {
+              inputBufferRef.current += hadGhost;
+              cursorPositionRef.current = inputBufferRef.current.length;
+              term.write(hadGhost);
+            } else if (cursorPositionRef.current < inputBufferRef.current.length) {
+              cursorPositionRef.current++;
+              term.write(data);
+            }
+          } else if (data === '\x1b[D') {
+            if (cursorPositionRef.current > 0) {
+              cursorPositionRef.current--;
+              term.write(data);
+            }
           }
-        } else if (data === '\x1b[C') {
-          if (cursorPositionRef.current >= inputBufferRef.current.length && hadGhost) {
+        } else if (code === 9) {
+          if (hadGhost && cursorPositionRef.current === inputBufferRef.current.length) {
             inputBufferRef.current += hadGhost;
             cursorPositionRef.current = inputBufferRef.current.length;
             term.write(hadGhost);
-          } else if (cursorPositionRef.current < inputBufferRef.current.length) {
-            cursorPositionRef.current++;
-            term.write(data);
+          } else {
+            handleTabCompletion();
           }
-        } else if (data === '\x1b[D') {
-          if (cursorPositionRef.current > 0) {
-            cursorPositionRef.current--;
-            term.write(data);
+        } else if (code === 3) {
+          term.write('^C');
+          inputBufferRef.current = '';
+          cursorPositionRef.current = 0;
+          historyIndexRef.current = commandHistoryRef.current.length;
+          tabPressCountRef.current = 0;
+          writePrompt();
+        } else if (code === 4) {
+          inputBufferRef.current = '';
+          cursorPositionRef.current = 0;
+          historyIndexRef.current = commandHistoryRef.current.length;
+          tabPressCountRef.current = 0;
+          writePrompt();
+        } else if (code >= 32 && code < 127) {
+          promptMultilineRef.current = false;
+          const before = inputBufferRef.current.slice(0, cursorPositionRef.current);
+          const after = inputBufferRef.current.slice(cursorPositionRef.current);
+          inputBufferRef.current = before + data + after;
+          cursorPositionRef.current++;
+          term.write(data + after);
+          if (after.length > 0) {
+            term.write(`\x1b[${after.length}D`);
           }
         }
-      } else if (code === 9) {
-        if (hadGhost && cursorPositionRef.current === inputBufferRef.current.length) {
-          inputBufferRef.current += hadGhost;
-          cursorPositionRef.current = inputBufferRef.current.length;
-          term.write(hadGhost);
-        } else {
-          handleTabCompletion();
-        }
-      } else if (code === 3) {
-        term.write('^C');
-        inputBufferRef.current = '';
-        cursorPositionRef.current = 0;
-        historyIndexRef.current = commandHistoryRef.current.length;
-        tabPressCountRef.current = 0;
-        writePrompt();
-      } else if (code === 4) {
-        inputBufferRef.current = '';
-        cursorPositionRef.current = 0;
-        historyIndexRef.current = commandHistoryRef.current.length;
-        tabPressCountRef.current = 0;
-        writePrompt();
-      } else if (code >= 32 && code < 127) {
-        promptMultilineRef.current = false;
-        const before = inputBufferRef.current.slice(0, cursorPositionRef.current);
-        const after = inputBufferRef.current.slice(cursorPositionRef.current);
-        inputBufferRef.current = before + data + after;
-        cursorPositionRef.current++;
-        term.write(data + after);
-        if (after.length > 0) {
-          term.write(`\x1b[${after.length}D`);
-        }
-      }
 
-      // Show ghost suggestion
-      if (inputBufferRef.current && cursorPositionRef.current === inputBufferRef.current.length) {
-        const ghost = computeGhostText();
-        if (ghost) {
-          term.write(`${ANSI.dim}${ghost}${ANSI.reset}\x1b[${ghost.length}D`);
-          ghostTextRef.current = ghost;
+        // Show ghost suggestion
+        if (inputBufferRef.current && cursorPositionRef.current === inputBufferRef.current.length) {
+          const ghost = computeGhostText();
+          if (ghost) {
+            term.write(`${ANSI.dim}${ghost}${ANSI.reset}\x1b[${ghost.length}D`);
+            ghostTextRef.current = ghost;
+          }
         }
-      }
 
-      if (onData) {
-        onData(data);
-      }
-    });
+        if (onData) {
+          onData(data);
+        }
+      });
 
-    xtermRef.current = term;
+      xtermRef.current = term;
+
+      return () => {
+        window.removeEventListener('resize', handleViewportResize);
+        window.visualViewport?.removeEventListener('resize', handleViewportResize);
+        window.visualViewport?.removeEventListener('scroll', handleViewportResize);
+        wrapper.removeEventListener('focusin', handleTerminalFocus);
+        darkQuery.removeEventListener('change', handleColorSchemeChange);
+        clearInterval(idleInterval);
+        // Must precede dispose(): a running animation would keep writing to a
+        // freed terminal, which ghostty-web throws on once per tick.
+        stopAllAnimations();
+        interactiveModeRef.current = null;
+        term.dispose();
+        xtermRef.current = null;
+      };
+    };
+
+    initGhostty()
+      .then(() => {
+        if (cancelled || !terminalRef.current || xtermRef.current) return;
+        teardown = setup(terminalRef.current);
+      })
+      .catch((err) => console.error('ghostty-web failed to initialise', err));
 
     return () => {
-      window.removeEventListener('resize', handleViewportResize);
-      window.visualViewport?.removeEventListener('resize', handleViewportResize);
-      window.visualViewport?.removeEventListener('scroll', handleViewportResize);
-      wrapper.removeEventListener('focusin', handleTerminalFocus);
-      darkQuery.removeEventListener('change', handleColorSchemeChange);
-      clearInterval(idleInterval);
-      term.dispose();
-      xtermRef.current = null;
+      cancelled = true;
+      teardown?.();
     };
   }, [handleCommand, handleTabCompletion, computeGhostText, onData, writePrompt, writeShortPrompt, applyTheme, getPromptInfo, getTerminalContext]);
 

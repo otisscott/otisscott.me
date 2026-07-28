@@ -1,5 +1,3 @@
-@import '@xterm/xterm/css/xterm.css';
-
 :root {
   --app-height: 100dvh;
 
@@ -95,76 +93,27 @@ a:hover {
   min-height: 0;
   overflow: hidden;
   position: relative;
+  /* ghostty-web makes this element contenteditable, which would otherwise
+     show a native caret on mobile — same problem 3de7cb6 fixed for xterm */
+  caret-color: transparent;
 }
 
-/* xterm.js Customizations */
-.xterm {
-  height: 100% !important;
-  width: 100% !important;
+/* ghostty-web renders into an unclassed <canvas> plus a hidden <textarea>,
+   so these are structural selectors rather than library class names. */
+.terminal-wrapper canvas {
+  display: block;
   max-width: 100%;
 }
 
-.xterm-viewport {
-  background-color: var(--bg-primary) !important;
-  overflow-y: auto !important;
-}
-
-.xterm .xterm-rows {
-  font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace !important;
-  line-height: 1.2;
-}
-
-/* Scrollbar Styling */
-.xterm-viewport::-webkit-scrollbar {
-  width: 8px;
-}
-
-.xterm-viewport::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: var(--fg-secondary);
+/* Hide the native mobile caret on the hidden input (see 3de7cb6) */
+.terminal-wrapper textarea {
+  caret-color: transparent !important;
+  font-size: 16px !important;
+  opacity: 0 !important;
 }
 
 /* Selection Styling */
 ::selection {
   background: var(--bg-tertiary);
   color: var(--fg-bright);
-}
-
-/* Focus Styles */
-.xterm:focus-within {
-  outline: none;
-}
-
-/* Hide native mobile caret on xterm's hidden textarea */
-.xterm textarea {
-  caret-color: transparent !important;
-  font-size: 16px !important;
-  opacity: 0 !important;
-}
-
-@media (max-width: 480px) {
-  .xterm-rows {
-    max-width: 100%;
-  }
-
-  .xterm-viewport::-webkit-scrollbar {
-    width: 0;
-  }
-}
-
-/* Cursor Styles */
-.xterm-cursor {
-  background-color: var(--fg-bright) !important;
-}
-
-.xterm-cursor-block {
-  background-color: var(--fg-bright) !important;
 }

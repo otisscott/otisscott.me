@@ -9,7 +9,7 @@
  * description so they stay out of `help` while remaining completable.
  */
 
-import { Terminal as XTerm } from '@xterm/xterm';
+import { Terminal as XTerm } from 'ghostty-web';
 import { ANSI } from '@/lib/filesystem/types';
 import { fileSystem } from '@/lib/filesystem';
 import { themes, themeNames, ColorMode } from '@/lib/theme/themes';

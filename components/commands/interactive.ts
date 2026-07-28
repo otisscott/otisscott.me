@@ -5,10 +5,50 @@
  * fire-and-forget animations that manage their own lifecycle.
  */
 
-import { Terminal as XTerm } from '@xterm/xterm';
+import { Terminal as XTerm } from 'ghostty-web';
 import { ANSI, padEndVisible, visibleLength } from '@/lib/filesystem/types';
 import { fileSystem } from '@/lib/filesystem/index';
 import { wrapWords } from '@/components/commands/handlers';
+
+/**
+ * Animations own their own timers, so nothing in the React tree can stop them
+ * once started. That was survivable under xterm.js, which ignored writes to a
+ * disposed terminal — ghostty-web throws "Terminal has been disposed" instead,
+ * so a leaked interval turns into an error every tick. Every timer here is
+ * tracked and cancelled from the Terminal cleanup via stopAllAnimations().
+ */
+const activeTimers = new Set<number>();
+
+function animInterval(fn: () => void, ms: number): number {
+  const id = window.setInterval(fn, ms);
+  activeTimers.add(id);
+  return id;
+}
+
+function animTimeout(fn: () => void, ms: number): number {
+  const id = window.setTimeout(() => {
+    activeTimers.delete(id);
+    fn();
+  }, ms);
+  activeTimers.add(id);
+  return id;
+}
+
+function animClear(id: number | null | undefined): void {
+  if (id == null) return;
+  clearInterval(id);   // ids are shared between timers and intervals
+  clearTimeout(id);
+  activeTimers.delete(id);
+}
+
+/** Cancel every running animation. Called when the terminal is torn down. */
+export function stopAllAnimations(): void {
+  activeTimers.forEach((id) => {
+    clearInterval(id);
+    clearTimeout(id);
+  });
+  activeTimers.clear();
+}
 
 export interface TerminalContext {
   term: XTerm;
@@ -266,7 +306,7 @@ function startVimEditor(ctx: TerminalContext, filepath: string, content: string)
           statusMsg = `${ANSI.yellow}Changes not saved — portfolio preview${ANSI.reset}`;
           // Brief flash of message then exit
           drawScreen();
-          setTimeout(() => exitEditor(), 800);
+          animTimeout(() => exitEditor(), 800);
           return;
         } else {
           const errCmd = cmd.slice(1);
@@ -584,7 +624,7 @@ export function startSl(ctx: TerminalContext): void {
   let pos = cols;
   let firstFrame = true;
 
-  const interval = setInterval(() => {
+  const interval = animInterval(() => {
     if (!firstFrame) {
       term.write(`\x1b[${train.length}A`);
     }
@@ -606,7 +646,7 @@ export function startSl(ctx: TerminalContext): void {
     pos -= 3;
 
     if (pos < -trainWidth) {
-      clearInterval(interval);
+      animClear(interval);
       resetInput();
       writePrompt();
     }
@@ -626,12 +666,12 @@ export function startRmRf(ctx: TerminalContext): void {
   ];
   let i = 0;
 
-  const interval = setInterval(() => {
+  const interval = animInterval(() => {
     if (i < files.length) {
       term.write(`\r\n${ANSI.red}rm: removing ${files[i]}${ANSI.reset}`);
       i++;
     } else {
-      clearInterval(interval);
+      animClear(interval);
       term.write(`\r\n\r\n${ANSI.green}Just kidding. Nice try though.${ANSI.reset}`);
       resetInput();
       writePrompt();
@@ -682,12 +722,12 @@ function startAiSession(ctx: TerminalContext, config: AiToolConfig): void {
   const pendingTimers: number[] = [];
 
   const later = (fn: () => void, ms: number) => {
-    pendingTimers.push(window.setTimeout(fn, ms));
+    pendingTimers.push(animTimeout(fn, ms));
   };
   const clearTimers = () => {
-    if (spinnerInterval) clearInterval(spinnerInterval);
+    if (spinnerInterval) animClear(spinnerInterval);
     spinnerInterval = null;
-    pendingTimers.forEach(clearTimeout);
+    pendingTimers.forEach(animClear);
     pendingTimers.length = 0;
   };
 
@@ -742,14 +782,14 @@ function startAiSession(ctx: TerminalContext, config: AiToolConfig): void {
     const verb = config.verbs[Math.floor(Math.random() * config.verbs.length)];
     let frame = 0;
     const started = Date.now();
-    spinnerInterval = window.setInterval(() => {
+    spinnerInterval = animInterval(() => {
       const f = config.spinnerFrames[frame++ % config.spinnerFrames.length];
       const secs = Math.floor((Date.now() - started) / 1000);
       term.write(`\r\x1b[K${config.promptColor}${f}${r} ${verb}… ${d}(${secs}s · esc to interrupt)${r}`);
     }, 90);
 
     later(() => {
-      if (spinnerInterval) clearInterval(spinnerInterval);
+      if (spinnerInterval) animClear(spinnerInterval);
       spinnerInterval = null;
       term.write('\r\x1b[K');
 
@@ -1210,13 +1250,13 @@ export function startScp(ctx: TerminalContext): void {
     term.write(`\r${ANSI.reset}resume.pdf ${String(pct).padStart(3)}% |${ANSI.green}${bar}${ANSI.reset}| ${String(kb).padStart(3)}KB ${speed}MB/s`);
   };
 
-  setTimeout(() => {
-    const interval = setInterval(() => {
+  animTimeout(() => {
+    const interval = animInterval(() => {
       progress += Math.floor(Math.random() * 12) + 5;
       if (progress >= 100) {
         progress = 100;
         drawProgress();
-        clearInterval(interval);
+        animClear(interval);
         term.write(`\r\n\r\n${ANSI.green}File received.${ANSI.reset}`);
         term.write(`\r\n${ANSI.dim}(Resume download not wired up yet — drop a PDF in public/ to enable)${ANSI.reset}`);
         resetInput();
@@ -1241,11 +1281,11 @@ export function startBgJob(
   const tickMs = 500;
   const increment = (tickMs / duration) * 100;
 
-  const intervalId = window.setInterval(() => {
+  const intervalId = animInterval(() => {
     progress += increment + (Math.random() * increment * 0.5);
     if (progress >= 100) {
       progress = 100;
-      clearInterval(intervalId);
+      animClear(intervalId);
       onDone();
     }
     onProgress(Math.min(progress, 100));
@@ -1288,14 +1328,14 @@ export function startTraceroute(ctx: TerminalContext): void {
       term.write(`\r\n${hops[i].text}`);
       i++;
       if (i < hops.length) {
-        setTimeout(next, hops[i].delay);
+        animTimeout(next, hops[i].delay);
       } else {
         resetInput();
         writePrompt();
       }
     }
   };
-  setTimeout(next, hops[0].delay);
+  animTimeout(next, hops[0].delay);
 }
 
 /**
@@ -1321,14 +1361,14 @@ export function startSsh(ctx: TerminalContext): void {
       term.write(`\r\n${steps[i].text}`);
       i++;
       if (i < steps.length) {
-        setTimeout(next, steps[i].delay);
+        animTimeout(next, steps[i].delay);
       } else {
         resetInput();
         writePrompt();
       }
     }
   };
-  setTimeout(next, steps[0].delay || 200);
+  animTimeout(next, steps[0].delay || 200);
 }
 
 /**
@@ -1344,7 +1384,7 @@ export function startHtop(ctx: TerminalContext, loadTime: number): void {
   const processes = [
     { pid: 1,   user: 'otis', baseCpu: 14, baseMem: 5.0, cmd: 'vault-os', color: ANSI.green },
     { pid: 22,  user: 'otis', baseCpu: 9,  baseMem: 3.8, cmd: 'next-dev-server', color: ANSI.green },
-    { pid: 55,  user: 'otis', baseCpu: 7,  baseMem: 3.2, cmd: 'xterm-renderer', color: ANSI.green },
+    { pid: 55,  user: 'otis', baseCpu: 7,  baseMem: 3.2, cmd: 'ghostty-renderer', color: ANSI.green },
     { pid: 101, user: 'otis', baseCpu: 5,  baseMem: 2.4, cmd: 'lwin-mapper', color: ANSI.cyan },
     { pid: 137, user: 'otis', baseCpu: 4,  baseMem: 1.8, cmd: 'dataearn-api', color: ANSI.cyan },
     { pid: 200, user: 'otis', baseCpu: 3,  baseMem: 1.4, cmd: 'theme-engine', color: ANSI.white },
@@ -1419,10 +1459,10 @@ export function startHtop(ctx: TerminalContext, loadTime: number): void {
   drawScreen();
 
   // Refresh every 750ms — frequent enough to feel alive, light enough to stay smooth
-  const refreshInterval = setInterval(drawScreen, 750);
+  const refreshInterval = animInterval(drawScreen, 750);
 
   const exitHtop = () => {
-    clearInterval(refreshInterval);
+    animClear(refreshInterval);
     setInteractiveMode(null);
     term.write('\x1b[2J\x1b[H');
     term.writeln(`${ANSI.dim}(Exited htop)${ANSI.reset}`);
@@ -1471,7 +1511,7 @@ export function startMatrix(ctx: TerminalContext): void {
 
   const at = (row: number, col: number, s: string) => `\x1b[${row};${col}H${s}`;
 
-  const interval = setInterval(() => {
+  const interval = animInterval(() => {
     let buf = '';
     for (let x = 0; x < cols; x++) {
       const d = drops[x];
@@ -1500,7 +1540,7 @@ export function startMatrix(ctx: TerminalContext): void {
   }, 80);
 
   const exitMatrix = () => {
-    clearInterval(interval);
+    animClear(interval);
     setInteractiveMode(null);
     term.write('\x1b[2J\x1b[H\x1b[?25h');
     term.writeln(`${ANSI.green}Wake up, Neo...${ANSI.reset} ${ANSI.dim}(you were in there for a while)${ANSI.reset}`);
@@ -1601,7 +1641,7 @@ export function startSnake(ctx: TerminalContext): void {
 
   const endGame = () => {
     gameOver = true;
-    if (interval) clearInterval(interval);
+    if (interval) animClear(interval);
     if (score > highScore) {
       highScore = score;
       saveHighScore(highScore);
@@ -1629,8 +1669,8 @@ export function startSnake(ctx: TerminalContext): void {
       // Speed up slightly with each bite, floor at 70ms
       if (tickMs > 70) {
         tickMs -= 3;
-        if (interval) clearInterval(interval);
-        interval = window.setInterval(tick, tickMs);
+        if (interval) animClear(interval);
+        interval = animInterval(tick, tickMs);
       }
     } else {
       snake.pop();
@@ -1641,11 +1681,11 @@ export function startSnake(ctx: TerminalContext): void {
   const startLoop = () => {
     reset();
     drawScreen();
-    interval = window.setInterval(tick, tickMs);
+    interval = animInterval(tick, tickMs);
   };
 
   const exitSnake = () => {
-    if (interval) clearInterval(interval);
+    if (interval) animClear(interval);
     setInteractiveMode(null);
     term.write('\x1b[2J\x1b[H\x1b[?25h');
     const sign = score >= 10 ? 'Respectable.' : 'The snake demands practice.';
@@ -1841,7 +1881,7 @@ export function startYes(ctx: TerminalContext, args: string[]): void {
   const { term, setInteractiveMode, resetInput, writePrompt } = ctx;
   const text = args.join(' ') || 'y';
 
-  const interval = setInterval(() => {
+  const interval = animInterval(() => {
     let buf = '';
     for (let i = 0; i < 6; i++) {
       buf += `\r\n${text}`;
@@ -1850,7 +1890,7 @@ export function startYes(ctx: TerminalContext, args: string[]): void {
   }, 50);
 
   const exitYes = () => {
-    clearInterval(interval);
+    animClear(interval);
     setInteractiveMode(null);
     term.write('\r\n^C');
     resetInput();
@@ -1881,7 +1921,7 @@ export function startKonami(ctx: TerminalContext): void {
   const center = (text: string, row: number) =>
     `\x1b[${row};${Math.max(1, Math.floor((cols - text.length) / 2))}H`;
 
-  const interval = setInterval(() => {
+  const interval = animInterval(() => {
     let buf = '';
     const n = Math.max(10, Math.floor((cols * rows) / 50));
     for (let i = 0; i < n; i++) {
@@ -1898,8 +1938,8 @@ export function startKonami(ctx: TerminalContext): void {
     term.write(buf);
   }, 90);
 
-  setTimeout(() => {
-    clearInterval(interval);
+  animTimeout(() => {
+    animClear(interval);
     setInteractiveMode(null);
     term.write('\x1b[2J\x1b[H\x1b[?25h');
     term.writeln(`${ANSI.bold}${ANSI.green}+30 lives${ANSI.reset}`);
@@ -1934,7 +1974,7 @@ export function startScreensaver(ctx: TerminalContext): void {
 
   term.write('\x1b[?25l');
 
-  const interval = setInterval(() => {
+  const interval = animInterval(() => {
     const cols = term.cols;
     const rows = term.rows;
     x += dx;
@@ -1959,7 +1999,7 @@ export function startScreensaver(ctx: TerminalContext): void {
 
   setInteractiveMode(() => {
     // Any key wakes it up
-    clearInterval(interval);
+    animClear(interval);
     setInteractiveMode(null);
     term.write('\x1b[2J\x1b[H\x1b[?25h');
     resetInput();
@@ -2030,7 +2070,7 @@ export function startAquarium(ctx: TerminalContext): void {
     return `\x1b[${row + 1};${col + 1}H${color}${visible}${ANSI.reset}`;
   };
 
-  const interval = setInterval(() => {
+  const interval = animInterval(() => {
     tickNum++;
     let buf = '\x1b[2J';
 
@@ -2078,7 +2118,7 @@ export function startAquarium(ctx: TerminalContext): void {
   }, 140);
 
   const exitAquarium = () => {
-    clearInterval(interval);
+    animClear(interval);
     setInteractiveMode(null);
     term.write('\x1b[2J\x1b[H\x1b[?25h');
     term.writeln(`${ANSI.dim}(Tank drained. The fish will miss you.)${ANSI.reset}`);
@@ -2118,12 +2158,12 @@ export function startMake(ctx: TerminalContext): void {
       term.write(`\r\n${steps[i].text}`);
       i++;
       if (i < steps.length) {
-        setTimeout(next, steps[i].delay);
+        animTimeout(next, steps[i].delay);
       } else {
         resetInput();
         writePrompt();
       }
     }
   };
-  setTimeout(next, steps[0].delay || 200);
+  animTimeout(next, steps[0].delay || 200);
 }

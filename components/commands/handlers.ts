@@ -533,7 +533,7 @@ export function neofetchCommand(loadTime: number, cols: number): string {
     `${w}${ANSI.bold}otis${R}${w}@${ANSI.bold}otisscott.me${R}`,
     `${ANSI.dim}${'─'.repeat(22)}${R}`,
     `${w}${ANSI.bold}OS${R}: ${os} / Web Browser`,
-    `${w}${ANSI.bold}Shell${R}: xterm.js`,
+    `${w}${ANSI.bold}Shell${R}: ghostty-web (libghostty)`,
     `${w}${ANSI.bold}Terminal${R}: otisscott.me`,
     `${w}${ANSI.bold}Theme${R}: Tokyo Night`,
     `${w}${ANSI.bold}Uptime${R}: ${uptimeStr}`,
@@ -938,35 +938,35 @@ ${ANSI.dim}hint: try 'docker ps' or 'docker images'${ANSI.reset}`;
       return `${ANSI.bold}CONTAINER ID   IMAGE                  STATUS                  NAMES${ANSI.reset}
 ${ANSI.green}a1b2c3d4e5f6${ANSI.reset}   otisscott-me:latest    ${upStr.padEnd(22)}  ${ANSI.cyan}portfolio${ANSI.reset}
 ${ANSI.green}f6e5d4c3b2a1${ANSI.reset}   theme-engine:1.0       ${upStr.padEnd(22)}  ${ANSI.cyan}theme-engine${ANSI.reset}
-${ANSI.green}1a2b3c4d5e6f${ANSI.reset}   xterm-renderer:3.2     ${upStr.padEnd(22)}  ${ANSI.cyan}xterm-renderer${ANSI.reset}`;
+${ANSI.green}1a2b3c4d5e6f${ANSI.reset}   ghostty-renderer:3.2   ${upStr.padEnd(22)}  ${ANSI.cyan}ghostty-renderer${ANSI.reset}`;
     case 'images':
       return `${ANSI.bold}REPOSITORY          TAG       SIZE${ANSI.reset}
 otisscott-me        latest    42MB
 theme-engine        1.0       8MB
-xterm-renderer      3.2       15MB
+ghostty-renderer    3.2       15MB
 ${ANSI.dim}cowsay              moo       1MB${ANSI.reset}`;
     case 'run':
       return `${ANSI.red}Error: permission denied${ANSI.reset}\n${ANSI.dim}hint: you can look, but you can't touch${ANSI.reset}`;
     case 'compose':
       if (args[1] === 'up') {
         return `${ANSI.green}[+] Running 3/3${ANSI.reset}
- ${ANSI.green}✔${ANSI.reset} Container portfolio       ${ANSI.green}Started${ANSI.reset}
- ${ANSI.green}✔${ANSI.reset} Container theme-engine    ${ANSI.green}Started${ANSI.reset}
- ${ANSI.green}✔${ANSI.reset} Container xterm-renderer  ${ANSI.green}Started${ANSI.reset}
+ ${ANSI.green}✔${ANSI.reset} Container portfolio         ${ANSI.green}Started${ANSI.reset}
+ ${ANSI.green}✔${ANSI.reset} Container theme-engine      ${ANSI.green}Started${ANSI.reset}
+ ${ANSI.green}✔${ANSI.reset} Container ghostty-renderer  ${ANSI.green}Started${ANSI.reset}
 ${ANSI.dim}Everything's already running. You're on the site.${ANSI.reset}`;
       }
       if (args[1] === 'down') {
         return `${ANSI.red}[+] Stopping 3/3${ANSI.reset}
- ${ANSI.red}✔${ANSI.reset} Container xterm-renderer  ${ANSI.red}Stopped${ANSI.reset}
- ${ANSI.red}✔${ANSI.reset} Container theme-engine    ${ANSI.red}Stopped${ANSI.reset}
- ${ANSI.red}✔${ANSI.reset} Container portfolio       ${ANSI.red}Stopped${ANSI.reset}
+ ${ANSI.red}✔${ANSI.reset} Container ghostty-renderer  ${ANSI.red}Stopped${ANSI.reset}
+ ${ANSI.red}✔${ANSI.reset} Container theme-engine      ${ANSI.red}Stopped${ANSI.reset}
+ ${ANSI.red}✔${ANSI.reset} Container portfolio         ${ANSI.red}Stopped${ANSI.reset}
 ${ANSI.dim}Just kidding. You can't shut down the site from the site.${ANSI.reset}`;
       }
       if (args[1] === 'ps') {
         return `${ANSI.bold}NAME              IMAGE                  STATUS${ANSI.reset}
 portfolio         otisscott-me:latest    ${ANSI.green}${upStr}${ANSI.reset}
 theme-engine      theme-engine:1.0       ${ANSI.green}${upStr}${ANSI.reset}
-xterm-renderer    xterm-renderer:3.2     ${ANSI.green}${upStr}${ANSI.reset}`;
+ghostty-renderer  ghostty-renderer:3.2   ${ANSI.green}${upStr}${ANSI.reset}`;
       }
       return `Usage: docker compose [up|down|ps]`;
     default:

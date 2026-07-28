@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 
-// Dynamically import the Terminal component to avoid SSR issues with xterm.js
+// Dynamically import the Terminal component — ghostty-web needs the DOM and WASM
 const Terminal = dynamic(() => import('@/components/terminal/Terminal'), {
   ssr: false,
   loading: () => (
