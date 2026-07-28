@@ -4,3 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # eslint-config-next depends on eslint-plugin-react, which still caps its
+      # eslint peer range at ^9 and calls context.getFilename() — removed in
+      # ESLint 10. Bumping eslint to 10 breaks `bun run lint` outright.
+      # Drop this ignore once eslint-plugin-react supports ESLint 10.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
