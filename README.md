@@ -31,6 +31,12 @@ bun dev
 # Open http://localhost:3000
 ```
 
+Adding a command means one entry in `components/commands/dispatch.ts` — help text,
+tab completion, and execution all derive from it.
+
+`gl` output is generated from real git history by `scripts/update-git-log.sh`, which
+runs as part of `bun run build` (or on demand via `bun run sync:gitlog`).
+
 ## Commands
 
 ### Navigation
@@ -93,8 +99,9 @@ app/
 
 components/
 ├── terminal/
-│   └── Terminal.tsx        # Main terminal + input handling
+│   └── Terminal.tsx        # xterm setup, key handling, shell (pipes, jobs, aliases)
 └── commands/
+    ├── dispatch.ts         # Command table — help, completion, and execution
     ├── handlers.ts         # Command implementations
     ├── interactive.ts      # Animations + full-screen modes
     └── man-pages.ts        # Man page content

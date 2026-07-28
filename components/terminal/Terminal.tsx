@@ -5,58 +5,32 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { themes, themeNames, ColorMode } from '@/lib/theme/themes';
+import { themes, ColorMode } from '@/lib/theme/themes';
 import {
   generatePromptInfo,
   generatePromptSymbol,
-  helpCommand,
   lsCommand,
-  cdCommand,
   pwdCommand,
   catCommand,
   whoamiCommand,
-  skillsCommand,
-  experienceCommand,
-  contactCommand,
-  projectsCommand,
-  gsCommand,
-  glCommand,
-  gitCommand,
-  neofetchCommand,
   cowsayCommand,
-  echoCommand,
   dateCommand,
-  sudoCommand,
-  exitCommand,
-  pingCommand,
-  treeCommand,
-  grepCommand,
   historyCommand,
-  openCommand,
-  packageManagerCommand,
-  uptimeCommand,
-  dockerCommand,
-  manCommand,
-  calCommand,
-  todoCommand,
-  aliasCommand,
-  unaliasCommand,
   loadAliases,
-  resolveAlias,
-  jobsCommand,
-  fgCommand,
-  bgCommand,
-  fortuneCommand,
   getFortune,
   figletCommand,
-  wineCommand,
-  momoCommand,
   lolcat,
-  getCompletions,
   setExitCode,
 } from '@/components/commands/handlers';
 import type { Job } from '@/components/commands/handlers';
-import { startVim, startSl, startRmRf, startClaude, startCodex, startOpencode, startTraceroute, startSsh, startHtop, startMake, startScp, startBgJob, startMatrix, startSnake, startWeather, startYes, startKonami, startScreensaver, startAquarium } from '@/components/commands/interactive';
+import {
+  runCommand,
+  resolveAlias,
+  getCompletions,
+  TAKEOVER,
+} from '@/components/commands/dispatch';
+import type { CommandContext } from '@/components/commands/dispatch';
+import { startBgJob, startKonami, startScreensaver } from '@/components/commands/interactive';
 import { ANSI, padEndVisible, stripAnsi } from '@/lib/filesystem/types';
 
 interface TerminalProps {
@@ -325,308 +299,28 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
 
       setExitCode(0);
 
-      switch (cmd) {
-        case 'help':
-          writeOutput(helpCommand(xtermRef.current?.cols ?? 80));
-          break;
-        case 'clear':
-          xtermRef.current?.clear();
-          break;
-        case 'date':
-          writeOutput(dateCommand());
-          break;
-        case 'pwd':
-          writeOutput(pwdCommand());
-          break;
-        case 'whoami':
-          writeOutput(whoamiCommand());
-          break;
-        case 'ls':
-          writeOutput(lsCommand(args));
-          break;
-        case 'cd': {
-          const cdResult = cdCommand(args);
-          if (cdResult) {
-            writeOutput(cdResult);
-          }
-          break;
-        }
-        case 'cat':
-          writeOutput(catCommand(args));
-          break;
-        case 'echo':
-          writeOutput(echoCommand(args));
-          break;
-        case 'skills':
-          writeOutput(skillsCommand());
-          break;
-        case 'experience':
-          writeOutput(experienceCommand());
-          break;
-        case 'contact':
-          writeOutput(contactCommand());
-          break;
-        case 'projects':
-          writeOutput(projectsCommand());
-          break;
-        case 'git':
-          writeOutput(gitCommand(args));
-          break;
-        case 'gs':
-          writeOutput(gsCommand());
-          break;
-        case 'gl':
-          writeOutput(glCommand());
-          break;
-        case 'neofetch':
-          writeOutput(neofetchCommand(loadTimeRef.current ?? Date.now(), xtermRef.current?.cols ?? 80));
-          break;
-        case 'cowsay':
-          writeOutput(cowsayCommand(args, xtermRef.current?.cols ?? 80));
-          break;
-        case 'sudo':
-          writeOutput(sudoCommand(args));
-          break;
-        case 'vim':
-        case 'vi':
-        case 'nano':
-          if (xtermRef.current) {
-            startVim(getTerminalContext(), args[0]);
-            return;
-          }
-          break;
-        case 'exit':
-        case 'quit':
-        case 'logout':
-          writeOutput(exitCommand());
-          break;
-        case 'ping':
-          writeOutput(pingCommand(args));
-          break;
-        case 'tree':
-          writeOutput(treeCommand(args));
-          break;
-        case 'grep':
-          writeOutput(grepCommand(args));
-          break;
-        case 'history':
-          // Support: history grep <pattern> as shortcut
-          if (args[0] === 'grep' && args.length > 1) {
-            const pattern = args.slice(1).join(' ');
-            const histOutput = historyCommand(commandHistoryRef.current);
-            const filtered = histOutput.split('\n').filter(line =>
-              line.toLowerCase().includes(pattern.toLowerCase())
-            );
-            writeOutput(filtered.length > 0 ? filtered.join('\n') : `${ANSI.dim}No matches for "${pattern}"${ANSI.reset}`);
-          } else {
-            writeOutput(historyCommand(commandHistoryRef.current));
-          }
-          break;
-        case 'open': {
-          const result = openCommand(args);
-          writeOutput(result.output);
-          if (result.url) {
-            window.open(result.url, '_blank');
-          }
-          break;
-        }
-        case 'theme': {
-          const themeName = args[0];
-          if (!themeName) {
-            const current = currentThemeRef.current;
-            const mode = colorModeRef.current;
-            let list = `${ANSI.bold}Available themes:${ANSI.reset} ${ANSI.dim}(${mode} mode)${ANSI.reset}\n\n`;
-            for (const name of themeNames) {
-              const marker = name === current ? ` ${ANSI.green}(active)${ANSI.reset}` : '';
-              list += `  ${ANSI.cyan}${name}${ANSI.reset}${marker}\n`;
-            }
-            list += `\n${ANSI.dim}Usage: theme <name>${ANSI.reset}`;
-            writeOutput(list);
-          } else if (themes[themeName]) {
-            const t = themes[themeName];
-            currentThemeRef.current = themeName;
-            applyTheme(themeName, colorModeRef.current);
-            writeOutput(`${ANSI.green}Switched to ${t.name} (${colorModeRef.current})${ANSI.reset}`);
-          } else {
-            setExitCode(1);
-            writeOutput(`${ANSI.red}theme: unknown theme '${themeName}'. Try 'theme' to list.${ANSI.reset}`);
-          }
-          break;
-        }
-        case 'rm': {
-          const fullArgs = args.join(' ');
-          if (fullArgs.includes('-rf') && (fullArgs.includes('/') || fullArgs.includes('~'))) {
-            if (xtermRef.current) {
-              startRmRf(getTerminalContext());
-              return;
-            }
-          } else {
-            writeOutput(`${ANSI.red}rm: permission denied${ANSI.reset}`);
-          }
-          break;
-        }
-        case 'sl':
-          if (xtermRef.current) {
-            startSl(getTerminalContext());
-            return;
-          }
-          break;
-        case 'claude':
-        case 'claude-code':
-          if (xtermRef.current) {
-            startClaude(getTerminalContext());
-            return;
-          }
-          break;
-        case 'codex':
-          if (xtermRef.current) {
-            startCodex(getTerminalContext());
-            return;
-          }
-          break;
-        case 'opencode':
-          if (xtermRef.current) {
-            startOpencode(getTerminalContext());
-            return;
-          }
-          break;
-        case 'uptime':
-          writeOutput(uptimeCommand(loadTimeRef.current ?? Date.now()));
-          break;
-        case 'docker':
-          writeOutput(dockerCommand(args, loadTimeRef.current ?? Date.now()));
-          break;
-        case 'traceroute':
-          if (xtermRef.current) {
-            startTraceroute(getTerminalContext());
-            return;
-          }
-          break;
-        case 'ssh':
-          if (xtermRef.current) {
-            startSsh(getTerminalContext());
-            return;
-          }
-          break;
-        case 'htop':
-        case 'top':
-          if (xtermRef.current) {
-            startHtop(getTerminalContext(), loadTimeRef.current ?? Date.now());
-            return;
-          }
-          break;
-        case 'make':
-          if (xtermRef.current) {
-            startMake(getTerminalContext());
-            return;
-          }
-          break;
-        case 'npm':
-        case 'npx':
-        case 'bun':
-        case 'bunx':
-        case 'uv':
-          writeOutput(packageManagerCommand(cmd));
-          break;
-        case 'man':
-          writeOutput(manCommand(args));
-          break;
-        case 'cal':
-        case 'ncal':
-          writeOutput(calCommand());
-          break;
-        case 'scp':
-          if (xtermRef.current) {
-            if (args.length === 0) {
-              writeOutput(`${ANSI.red}usage: scp [user@]host:file dest${ANSI.reset}`);
-            } else {
-              startScp(getTerminalContext());
-              return;
-            }
-          }
-          break;
-        case 'todo':
-          writeOutput(todoCommand(args));
-          break;
-        case 'alias':
-          writeOutput(aliasCommand(args));
-          // Refresh cached aliases
-          aliasesRef.current = loadAliases();
-          break;
-        case 'unalias':
-          writeOutput(unaliasCommand(args));
-          aliasesRef.current = loadAliases();
-          break;
-        case 'jobs':
-          // Clean up completed jobs older than the list view
-          writeOutput(jobsCommand(jobsRef.current));
-          break;
-        case 'fortune':
-          writeOutput(fortuneCommand(xtermRef.current?.cols ?? 80));
-          break;
-        case 'figlet':
-          writeOutput(figletCommand(args, xtermRef.current?.cols ?? 80));
-          break;
-        case 'wine':
-          writeOutput(wineCommand(args, xtermRef.current?.cols ?? 80));
-          break;
-        case 'momo':
-          writeOutput(momoCommand(args));
-          break;
-        case 'lolcat':
-          writeOutput(`${ANSI.dim}usage: <command> | lolcat${ANSI.reset}\n${lolcat('Try: figlet otis | lolcat')}`);
-          break;
-        case 'yes':
-          if (xtermRef.current) {
-            startYes(getTerminalContext(), args);
-            return;
-          }
-          break;
-        case 'asciiquarium':
-        case 'aquarium':
-          if (xtermRef.current) {
-            startAquarium(getTerminalContext());
-            return;
-          }
-          break;
-        case 'screensaver':
-          if (xtermRef.current) {
-            startScreensaver(getTerminalContext());
-            return;
-          }
-          break;
-        case 'konami':
-          writeOutput(`${ANSI.dim}That's not how cheat codes work. Use the actual buttons:${ANSI.reset}\n${ANSI.bold}↑ ↑ ↓ ↓ ← → ← → B A${ANSI.reset}`);
-          break;
-        case 'snake':
-          if (xtermRef.current) {
-            startSnake(getTerminalContext());
-            return;
-          }
-          break;
-        case 'matrix':
-        case 'cmatrix':
-          if (xtermRef.current) {
-            startMatrix(getTerminalContext());
-            return;
-          }
-          break;
-        case 'weather':
-          if (xtermRef.current) {
-            startWeather(getTerminalContext(), args);
-            return;
-          }
-          break;
-        case 'fg':
-          writeOutput(fgCommand(args, jobsRef.current));
-          break;
-        case 'bg':
-          writeOutput(bgCommand());
-          break;
-        default:
-          setExitCode(1);
-          writeOutput(`${ANSI.red}zsh: command not found: ${cmd}${ANSI.reset}`);
-      }
+      const ctx: CommandContext = {
+        args,
+        term: xtermRef.current!,
+        cols: xtermRef.current?.cols ?? 80,
+        loadTime: loadTimeRef.current ?? Date.now(),
+        history: commandHistoryRef.current,
+        jobs: jobsRef.current,
+        out: writeOutput,
+        interactive: getTerminalContext(),
+        theme: {
+          current: currentThemeRef.current,
+          mode: colorModeRef.current,
+          set: (name: string) => {
+            currentThemeRef.current = name;
+            applyTheme(name, colorModeRef.current);
+          },
+        },
+        reloadAliases: () => { aliasesRef.current = loadAliases(); },
+      };
+
+      // A command that seized the terminal drives its own prompt
+      if (runCommand(cmd, ctx) === TAKEOVER) return;
     }
 
     inputBufferRef.current = '';

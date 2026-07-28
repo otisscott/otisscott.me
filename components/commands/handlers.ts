@@ -15,10 +15,6 @@ export function setExitCode(code: number) {
   lastExitCode = code;
 }
 
-export function getExitCode(): number {
-  return lastExitCode;
-}
-
 // Prompt info line (path, branch, node version)
 export function generatePromptInfo(compact = false): string {
   const currentPath = fileSystem.getCurrentPath();
@@ -35,105 +31,6 @@ export function generatePromptSymbol(): string {
   return `${PromptColors.promptSymbol}❯${PromptColors.reset} `;
 }
 
-// ── Command Registry ─────────────────────────────────────────────────
-// Single source of truth. Adding a command here wires up help, tab
-// completion, and alias resolution automatically.  Hidden commands
-// (aliases like gs/gl, easter eggs like sl) omit description so they
-// don't clutter help but still complete and resolve.
-
-interface CommandEntry {
-  category: 'Navigation' | 'Portfolio' | 'Tools' | 'hidden';
-  description?: string;  // omit to hide from help
-}
-
-const COMMAND_REGISTRY: Record<string, CommandEntry> = {
-  // Navigation
-  ls:          { category: 'Navigation', description: 'List directory contents' },
-  cd:          { category: 'Navigation', description: 'Change directory' },
-  pwd:         { category: 'Navigation', description: 'Print working directory' },
-  cat:         { category: 'Navigation', description: 'Display file contents' },
-  tree:        { category: 'Navigation', description: 'Show directory tree' },
-  grep:        { category: 'Navigation', description: 'Search file contents' },
-  open:        { category: 'Navigation', description: 'Open URL from file' },
-
-  // Portfolio
-  whoami:      { category: 'Portfolio', description: 'Display user information' },
-  skills:      { category: 'Portfolio', description: 'Display technical skills' },
-  experience:  { category: 'Portfolio', description: 'List work history' },
-  contact:     { category: 'Portfolio', description: 'Display contact information' },
-  projects:    { category: 'Portfolio', description: 'List all projects' },
-
-  // Tools
-  help:        { category: 'Tools', description: 'Show this help message' },
-  clear:       { category: 'Tools', description: 'Clear the terminal' },
-  echo:        { category: 'Tools', description: 'Print text to the terminal' },
-  date:        { category: 'Tools', description: 'Show current date and time' },
-  history:     { category: 'Tools', description: 'Show command history' },
-  ping:        { category: 'Tools', description: 'Ping a host' },
-  theme:       { category: 'Tools', description: 'Change color theme' },
-  git:         { category: 'Tools', description: 'Git commands (log, blame, status...)' },
-  traceroute:  { category: 'Tools', description: 'Trace the route to otisscott.me' },
-  neofetch:    { category: 'Tools', description: 'Display system info' },
-  cowsay:      { category: 'Tools', description: 'ASCII cow says a message' },
-  man:         { category: 'Tools', description: 'Display manual pages' },
-  cal:         { category: 'Tools', description: 'Show calendar' },
-  scp:         { category: 'Tools', description: 'Secure file copy' },
-  todo:        { category: 'Tools', description: 'Personal todo list' },
-  alias:       { category: 'Tools', description: 'Define command aliases' },
-  jobs:        { category: 'Tools', description: 'List background jobs' },
-  fortune:     { category: 'Tools', description: 'Print a random fortune' },
-  figlet:      { category: 'Tools', description: 'ASCII art banner text' },
-  weather:     { category: 'Tools', description: 'Live weather report' },
-  snake:       { category: 'Tools', description: 'Play snake' },
-
-  // Hidden — completable but not in help
-  gs:          { category: 'hidden' },
-  gl:          { category: 'hidden' },
-  vim:         { category: 'hidden' },
-  vi:          { category: 'hidden' },
-  nano:        { category: 'hidden' },
-  sudo:        { category: 'hidden' },
-  exit:        { category: 'hidden' },
-  quit:        { category: 'hidden' },
-  logout:      { category: 'hidden' },
-  sl:          { category: 'hidden' },
-  rm:          { category: 'hidden' },
-  docker:      { category: 'hidden' },
-  ssh:         { category: 'hidden' },
-  htop:        { category: 'hidden' },
-  top:         { category: 'hidden' },
-  uptime:      { category: 'hidden' },
-  make:        { category: 'hidden' },
-  npm:         { category: 'hidden' },
-  npx:         { category: 'hidden' },
-  bun:         { category: 'hidden' },
-  bunx:        { category: 'hidden' },
-  uv:          { category: 'hidden' },
-  claude:      { category: 'hidden' },
-  'claude-code': { category: 'hidden' },
-  codex:       { category: 'hidden' },
-  opencode:    { category: 'hidden' },
-  ncal:        { category: 'hidden' },
-  unalias:     { category: 'hidden' },
-  fg:          { category: 'hidden' },
-  bg:          { category: 'hidden' },
-  matrix:      { category: 'hidden' },
-  cmatrix:     { category: 'hidden' },
-  wine:        { category: 'hidden' },
-  momo:        { category: 'hidden' },
-  lolcat:      { category: 'hidden' },
-  yes:         { category: 'hidden' },
-  asciiquarium: { category: 'hidden' },
-  aquarium:    { category: 'hidden' },
-  konami:      { category: 'hidden' },
-  screensaver: { category: 'hidden' },
-};
-
-// Derived sets — no separate lists to maintain
-const BUILTIN_COMMANDS = new Set(Object.keys(COMMAND_REGISTRY));
-const COMPLETABLE_COMMANDS = Object.keys(COMMAND_REGISTRY);
-
-// Help command — generated from the registry
 export function wrapWords(text: string, width: number): string[] {
   if (width <= 0 || text.length <= width) return [text];
   const lines: string[] = [];
@@ -152,25 +49,6 @@ export function wrapWords(text: string, width: number): string[] {
 
   if (line) lines.push(line);
   return lines;
-}
-
-export function helpCommand(cols = 80): string {
-  const categories = ['Navigation', 'Portfolio', 'Tools'] as const;
-  const sections = categories.map(cat => {
-    const descriptionWidth = Math.max(18, cols - 17);
-    const cmds = Object.entries(COMMAND_REGISTRY)
-      .filter(([, e]) => e.category === cat && e.description)
-      .map(([name, e]) => {
-        const [first, ...rest] = wrapWords(e.description ?? '', descriptionWidth);
-        const wrapped = rest.map(line => `  ${' '.repeat(13)}  ${line}`).join('\n');
-        return `  ${ANSI.green}${name.padEnd(12)}${ANSI.reset}- ${first}${wrapped ? `\n${wrapped}` : ''}`;
-      })
-      .join('\n');
-    return `  ${ANSI.cyan}${cat}${ANSI.reset}\n${cmds}`;
-  });
-
-  const tip = wrapWords('Tip: Use Tab for autocomplete, try sl or fortune | cowsay', Math.max(24, cols - 2)).join('\n');
-  return `${ANSI.bold}Available commands:${ANSI.reset}\n\n${sections.join('\n\n')}\n\n${ANSI.dim}${tip.replace('sl', `${ANSI.reset}${ANSI.green}sl${ANSI.reset}${ANSI.dim}`)}${ANSI.reset}`;
 }
 
 // LS command with flags
@@ -896,19 +774,6 @@ ${ANSI.red}otis is not in the sudoers file. This incident will be reported.${ANS
 }
 
 // Vim command
-export function vimCommand(): string {
-  return `
-${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}
-${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}
-${ANSI.bold}${ANSI.white}~                 VIM - Vi IMproved                  ${ANSI.reset}
-${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}
-${ANSI.bold}${ANSI.white}~             type :q! to exit${ANSI.reset}${ANSI.dim} (just kidding)${ANSI.reset}
-${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}
-${ANSI.bold}${ANSI.white}~         ${ANSI.reset}${ANSI.green}You've been trapped. There is no escape.${ANSI.reset}
-${ANSI.bold}${ANSI.white}~         ${ANSI.reset}${ANSI.dim}Press any key to continue...${ANSI.reset}
-${ANSI.bold}${ANSI.white}~                                                   ${ANSI.reset}`;
-}
-
 // Exit command
 export function exitCommand(): string {
   return `${ANSI.magenta}There is no escape. You live here now.${ANSI.reset}
@@ -1321,17 +1186,6 @@ export function unaliasCommand(args: string[]): string {
 }
 
 // Resolve aliases (single-pass, no recursion to avoid loops)
-export function resolveAlias(command: string, aliases: Record<string, string>): string {
-  const parts = command.split(' ');
-  const cmd = parts[0];
-  // Don't override builtins
-  if (BUILTIN_COMMANDS.has(cmd)) return command;
-  if (cmd in aliases) {
-    return aliases[cmd] + (parts.length > 1 ? ' ' + parts.slice(1).join(' ') : '');
-  }
-  return command;
-}
-
 // Jobs command — display background job table
 export interface Job {
   id: number;
@@ -1375,25 +1229,4 @@ export function fgCommand(args: string[], jobs: Job[]): string {
 
 export function bgCommand(): string {
   return `bg: no stopped jobs`;
-}
-
-// Tab completion — driven by COMMAND_REGISTRY + filesystem
-export function getCompletions(input: string): { completions: string[]; prefix: string } {
-  const trimmed = input.trim();
-  const parts = trimmed.split(' ');
-
-  // Completing a command name
-  if (parts.length === 1 && !trimmed.includes(' ')) {
-    const matches = COMPLETABLE_COMMANDS.filter(cmd => cmd.startsWith(trimmed));
-    return { completions: matches, prefix: '' };
-  }
-
-  // Completing a path argument
-  if (parts.length >= 1) {
-    const pathArg = parts.slice(1).join(' ') || '';
-    const completions = fileSystem.getCompletions(pathArg);
-    return { completions, prefix: pathArg };
-  }
-
-  return { completions: [], prefix: '' };
 }
