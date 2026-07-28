@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "bash scripts/update-git-log.sh && next build",
+    "sync:gitlog": "bash scripts/update-git-log.sh",
     "start": "next start",
     "lint": "eslint"
   },
