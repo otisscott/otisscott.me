@@ -10,7 +10,7 @@ import { ANSI, padEndVisible, visibleLength } from '@/lib/filesystem/types';
 import { fileSystem } from '@/lib/filesystem/index';
 import { wrapWords } from '@/components/commands/handlers';
 
-interface TerminalContext {
+export interface TerminalContext {
   term: XTerm;
   setInteractiveMode: (handler: ((data: string) => void) | null) => void;
   resetInput: () => void;
@@ -889,7 +889,7 @@ export function startClaude(ctx: TerminalContext): void {
             'Be nice to visitors.',
           ].join('\n');
         case '/model':
-          return `${d}⎿  ${r}Kept model as ${ANSI.bold}fable${r} ${d}(claude-fable-5)${r}\n${d}   There is nothing above Fable 5. All models are equally decorative in here anyway.${r}`;
+          return `${d}⎿  ${r}Kept model as ${ANSI.bold}fable (high)${r} ${d}(claude-fable-5)${r}\n${d}   There is nothing above Fable 5. All models are equally decorative in here anyway.${r}`;
         case '/cost':
           return [
             `Total cost:            ${ANSI.green}$0.00${r}`,
@@ -902,7 +902,7 @@ export function startClaude(ctx: TerminalContext): void {
           return [
             `${ANSI.bold}Claude Code Status${r}`,
             `${d}─────────────────────────${r}`,
-            `Model:      fable · Fable 5 (decorative)`,
+            `Model:      fable · Fable 5 (high, decorative)`,
             `Account:    otis · Claude Max`,
             `Directory:  ~/Projects/otisscott.me`,
             `MCP:        0 servers (it's a website)`,
@@ -940,7 +940,7 @@ export function startClaude(ctx: TerminalContext): void {
         row(`${' '.repeat(Math.max(0, Math.floor((LW - 7) / 2)))}${ANSI.magenta}▐▛███▜▌${r}`, ` ${ANSI.dim}Recent activity${r}`),
         row(`${' '.repeat(Math.max(0, Math.floor((LW - 9) / 2)))}${ANSI.magenta}▝▜█████▛▘${r}`, ` ${ANSI.dim}No recent activity${r}`),
         row(`${' '.repeat(Math.max(0, Math.floor((LW - 6) / 2)))}${ANSI.magenta}▘▘ ▝▝${r}`, ''),
-        row(`${' '.repeat(Math.max(0, Math.floor((LW - 20) / 2)))}${ANSI.dim}Fable 5 · Claude Max${r}`, ''),
+        row(`${' '.repeat(Math.max(0, Math.floor((LW - 25) / 2)))}${ANSI.dim}Fable 5 high · Claude Max${r}`, ''),
         row(`${' '.repeat(Math.max(0, Math.floor((LW - 23) / 2)))}${ANSI.dim}~/Projects/otisscott.me${r}`, ''),
         `${o}╰${'─'.repeat(W)}╯${r}`,
       ];
@@ -959,10 +959,10 @@ export function startCodex(ctx: TerminalContext): void {
     promptChar: '>',
     promptColor: ANSI.green,
     spinnerFrames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
-    verbs: ['Thinking', 'Reasoning (low)', 'Reticulating splines', 'Consulting the weights', 'Compiling thoughts', 'Deliberating'],
+    verbs: ['Thinking', 'Reasoning (high)', 'Reticulating splines', 'Consulting the weights', 'Compiling thoughts', 'Deliberating'],
     responses: [
       {
-        text: "gpt-5.5-low here. My reasoning effort is set to low, and my permissions are set even lower. It's a living.",
+        text: "gpt-5.6-sol-high here. My reasoning effort is maxed and my permissions are read-only. All this thinking and nowhere to put it.",
       },
       {
         steps: [{ tool: 'exec: ls -la', result: '6 directories, 0 secrets' }],
@@ -990,12 +990,12 @@ export function startCodex(ctx: TerminalContext): void {
             `  ${ANSI.cyan}/exit${r}    leave (Ctrl+C also works)`,
           ].join('\n');
         case '/model':
-          return `${d}model changed:${r} gpt-5.5-low ${d}→${r} ${ANSI.bold}gpt-5.5-xlow${r}\n${d}Now thinking even less about nothing.${r}`;
+          return `${d}model unchanged:${r} ${ANSI.bold}gpt-5.6-sol-high${r}\n${d}Already at the top. The only way from here is sideways.${r}`;
         case '/status':
           return [
             `${d}>_${r} ${ANSI.bold}OpenAI Codex${r}`,
             `${d}─────────────────────────${r}`,
-            `model:      gpt-5.5-low`,
+            `model:      gpt-5.6-sol-high`,
             `sandbox:    read-only (very)`,
             `directory:  ~/Projects/otisscott.me`,
             `tokens:     0 in / 0 out ${d}(decorative)${r}`,
@@ -1008,7 +1008,7 @@ export function startCodex(ctx: TerminalContext): void {
       if (c < 58) {
         return [
           `${d}>_${r} ${ANSI.bold}OpenAI Codex${r}`,
-          `${d}model:${r} gpt-5.5-low`,
+          `${d}model:${r} gpt-5.6-sol-high`,
         ];
       }
 
@@ -1021,7 +1021,7 @@ export function startCodex(ctx: TerminalContext): void {
         `${d}╭── ${'─'.repeat(topFill - 1)}╮${r}`,
         row(`${d}>_${r} ${ANSI.bold}OpenAI Codex${r} ${d}(v0.1.2503262313)${r}`),
         row(''),
-        row(`${d}model:     ${r}gpt-5.5-low   ${d}/model${ANSI.cyan} to change${r}`),
+        row(`${d}model:     ${r}gpt-5.6-sol-high   ${d}/model${ANSI.cyan} to change${r}`),
         row(`${d}directory: ${r}~/Projects/otisscott.me`),
         `${d}╰${'─'.repeat(W + 2)}╯${r}`,
       ];
@@ -1113,7 +1113,7 @@ export function startOpencode(ctx: TerminalContext): void {
     term.write(`${' '.repeat(inputPad)}${ANSI.cyan}│${r}${inputLine}\r\n`);
 
     // Model info line
-    const modelLine = `${inputBg} ${ANSI.cyan}Sisyphus${r}${inputBg}  ${ANSI.white}Kimi K2.5${r}${inputBg}  ${d}Moonshot${r}${inputBg}${' '.repeat(Math.max(0, inputW - 30))} ${r}`;
+    const modelLine = `${inputBg} ${ANSI.cyan}Sisyphus${r}${inputBg}  ${ANSI.white}Kimi K3${r}${inputBg}  ${d}Moonshot${r}${inputBg}${' '.repeat(Math.max(0, inputW - 28))} ${r}`;
     term.write(`${' '.repeat(inputPad)}${ANSI.cyan}│${r}${modelLine}\r\n`);
 
     term.write('\r\n');
