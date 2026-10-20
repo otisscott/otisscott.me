@@ -1,9 +1,25 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
+  - package-ecosystem: "bun"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "otisscott"
+    assignees:
+      - "otisscott"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
     ignore:
       # eslint-config-next depends on eslint-plugin-react, which still caps its
       # eslint peer range at ^9 and calls context.getFilename() — removed in
@@ -11,3 +27,7 @@ updates:
       # Drop this ignore once eslint-plugin-react supports ESLint 10.
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+    groups:
+      javascript-dependencies:
+        patterns:
+          - "*"
