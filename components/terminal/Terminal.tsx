@@ -28,7 +28,7 @@ import {
 } from '@/components/commands/dispatch';
 import type { CommandContext } from '@/components/commands/dispatch';
 import { startBgJob, startKonami, startScreensaver, stopAllAnimations } from '@/components/commands/interactive';
-import { ANSI, padEndVisible, stripAnsi } from '@/lib/filesystem/types';
+import { ANSI, padEndVisible, stripAnsi, visibleLength } from '@/lib/filesystem/types';
 
 export default function Terminal() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,7 +39,6 @@ export default function Terminal() {
   const commandHistoryRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
   const cursorPositionRef = useRef(0);
-  const tabPressCountRef = useRef(0);
   const ghostTextRef = useRef('');
   const currentThemeRef = useRef('tokyo-night');
   const colorModeRef = useRef<ColorMode>('dark');
@@ -48,7 +47,7 @@ export default function Terminal() {
   const aliasesRef = useRef<Record<string, string>>({});
   const jobsRef = useRef<Job[]>([]);
   const nextJobIdRef = useRef(1);
-  const promptMultilineRef = useRef(false);
+  const lineCursorRef = useRef(0);
   const konamiRef = useRef<string[]>([]);
   const lastActivityRef = useRef<number | null>(null);
 
@@ -60,15 +59,9 @@ export default function Terminal() {
   const writePrompt = useCallback(() => {
     if (xtermRef.current) {
       xtermRef.current.write('\r\n' + getPromptInfo() + '\r\n' + generatePromptSymbol());
-      promptMultilineRef.current = true;
+      lineCursorRef.current = visibleLength(generatePromptSymbol());
     }
   }, [getPromptInfo]);
-
-  const writeShortPrompt = useCallback(() => {
-    if (xtermRef.current) {
-      xtermRef.current.write(generatePromptSymbol());
-    }
-  }, []);
 
   const writeOutput = useCallback((output: string) => {
     if (xtermRef.current && output) {
@@ -76,71 +69,65 @@ export default function Terminal() {
     }
   }, []);
 
+  const renderLine = useCallback((ghost = '') => {
+    const term = xtermRef.current;
+    if (!term) return;
+    const cols = term.cols;
+    const symbol = generatePromptSymbol();
+    const input = inputBufferRef.current;
+    const up = Math.floor(lineCursorRef.current / cols);
+    let seq = (up > 0 ? `\x1b[${up}A` : '') + '\r\x1b[J' + symbol + input;
+    if (ghost) seq += `${ANSI.dim}${ghost}${ANSI.reset}`;
+    const end = visibleLength(symbol) + input.length + ghost.length;
+    if (end % cols === 0) seq += ' \r';
+    const target = visibleLength(symbol) + cursorPositionRef.current;
+    const rowsBack = Math.floor(end / cols) - Math.floor(target / cols);
+    if (rowsBack > 0) seq += `\x1b[${rowsBack}A`;
+    seq += `\x1b[${(target % cols) + 1}G`;
+    term.write(seq);
+    lineCursorRef.current = target;
+  }, []);
+
   const handleTabCompletion = useCallback(() => {
     const input = inputBufferRef.current;
-    const { completions, prefix } = getCompletions(input);
-
+    const { completions, prefix, isCommand } = getCompletions(input);
     if (completions.length === 0) return;
 
-    const parts = input.split(' ');
-    const isCmd = parts.length === 1 && !input.includes(' ');
-
-    const updateInput = (value: string) => {
+    const head = input.slice(0, input.length - prefix.length);
+    const setInput = (value: string) => {
       inputBufferRef.current = value;
       cursorPositionRef.current = value.length;
-      if (xtermRef.current) {
-        xtermRef.current.write('\r\x1b[K');
-        writeShortPrompt();
-        xtermRef.current.write(value);
-      }
     };
 
     if (completions.length === 1) {
-      // Single match — complete it (completions already include full path)
-      if (isCmd) {
-        updateInput(completions[0] + ' ');
-      } else {
-        updateInput(`${parts[0]} ${completions[0]}`);
-      }
-      tabPressCountRef.current = 0;
+      const done = completions[0];
+      setInput(head + done + (isCommand || !done.endsWith('/') ? ' ' : ''));
       return;
     }
 
-    // Multiple matches — find longest common prefix
     const lcp = completions.reduce((p, c) => {
       while (!c.startsWith(p)) p = p.slice(0, -1);
       return p;
     }, completions[0]);
 
     if (lcp.length > prefix.length) {
-      // Can extend to LCP
-      if (isCmd) {
-        updateInput(lcp);
-      } else {
-        updateInput(`${parts[0]} ${lcp}`);
-      }
-      tabPressCountRef.current = 0;
-    } else {
-      // Already at LCP — show all options immediately
-      if (xtermRef.current) {
-        const display = completions.map(c => {
-          const slash = c.lastIndexOf('/');
-          return slash >= 0 ? c.slice(slash + 1) : c;
-        });
-        xtermRef.current.writeln('');
-        xtermRef.current.writeln(display.join('  '));
-        writeShortPrompt();
-        xtermRef.current.write(inputBufferRef.current);
-      }
-      tabPressCountRef.current = 0;
+      setInput(head + lcp);
+    } else if (xtermRef.current) {
+      const display = completions.map(c => {
+        const slash = c.lastIndexOf('/', c.length - 2);
+        return slash >= 0 ? c.slice(slash + 1) : c;
+      });
+      cursorPositionRef.current = input.length;
+      renderLine();
+      xtermRef.current.write('\r\n' + display.join('  ') + '\r\n');
+      lineCursorRef.current = 0;
     }
-  }, [writeShortPrompt]);
+  }, [renderLine]);
 
   const computeGhostText = useCallback((): string => {
     const input = inputBufferRef.current;
     if (!input || cursorPositionRef.current !== input.length) return '';
 
-    // Try command history first (most recent match)
     for (let i = commandHistoryRef.current.length - 1; i >= 0; i--) {
       const histCmd = commandHistoryRef.current[i];
       if (histCmd.startsWith(input) && histCmd !== input) {
@@ -148,22 +135,11 @@ export default function Terminal() {
       }
     }
 
-    // Fall back to single-match completions
-    const { completions } = getCompletions(input);
-    if (completions.length === 1) {
-      const parts = input.split(' ');
-      if (parts.length <= 1 && !input.includes(' ')) {
-        // Command completion
-        return completions[0].slice(input.length) + ' ';
-      } else {
-        // Path completion — completions already include full path
-        const completed = `${parts[0]} ${completions[0]}`;
-        if (completed.startsWith(input)) {
-          return completed.slice(input.length);
-        }
-      }
+    const { completions, prefix, isCommand } = getCompletions(input);
+    if (completions.length === 1 && prefix) {
+      const done = completions[0];
+      return done.slice(prefix.length) + (isCommand ? ' ' : '');
     }
-
     return '';
   }, []);
 
@@ -175,7 +151,6 @@ export default function Terminal() {
     resetInput: () => {
       inputBufferRef.current = '';
       cursorPositionRef.current = 0;
-      tabPressCountRef.current = 0;
     },
     writePrompt,
   }), [writePrompt]);
@@ -202,7 +177,7 @@ export default function Terminal() {
 
       // Pipes: <producer> | <filter> [| <filter> ...]
       // e.g. fortune | cowsay | lolcat, figlet otis | lolcat, history | grep ls
-      if (resolved.includes(' | ')) {
+      if (resolved.includes('|')) {
         const cols = xtermRef.current?.cols ?? 80;
         const segments = resolved.split('|').map(s => s.trim()).filter(Boolean);
         const [first, ...filters] = segments;
@@ -254,7 +229,6 @@ export default function Terminal() {
         setExitCode(0);
         inputBufferRef.current = '';
         cursorPositionRef.current = 0;
-        tabPressCountRef.current = 0;
         writePrompt();
         return;
       }
@@ -275,7 +249,6 @@ export default function Terminal() {
           writeOutput(`[${jobId}] ${pid} Running   ${bgCmd} &`);
           inputBufferRef.current = '';
           cursorPositionRef.current = 0;
-          tabPressCountRef.current = 0;
           writePrompt();
           return;
         }
@@ -313,7 +286,6 @@ export default function Terminal() {
 
     inputBufferRef.current = '';
     cursorPositionRef.current = 0;
-    tabPressCountRef.current = 0;
     writePrompt();
   }, [writePrompt, writeOutput, getTerminalContext, applyTheme]);
 
@@ -388,7 +360,7 @@ export default function Terminal() {
         }
 
         term.write(getPromptInfo() + '\r\n' + generatePromptSymbol());
-        promptMultilineRef.current = true;
+        lineCursorRef.current = visibleLength(generatePromptSymbol());
       };
 
       // Fit terminal using FitAddon (which properly measures char dimensions)
@@ -484,109 +456,107 @@ export default function Terminal() {
           return;
         }
 
-        const code = data.charCodeAt(0);
+        const ghost = ghostTextRef.current;
+        ghostTextRef.current = '';
+        const buf = inputBufferRef.current;
+        const pos = cursorPositionRef.current;
+        const atEnd = pos === buf.length;
+        const history = commandHistoryRef.current;
+        const set = (value: string, cursor = value.length) => {
+          inputBufferRef.current = value;
+          cursorPositionRef.current = cursor;
+        };
+        const abandonLine = () => {
+          cursorPositionRef.current = buf.length;
+          renderLine();
+        };
 
-        // Save and clear ghost text before processing input
-        const hadGhost = ghostTextRef.current;
-        if (hadGhost) {
-          term.write('\x1b[K');
-          ghostTextRef.current = '';
-        }
-
-        if (code === 13) {
-          handleCommand(inputBufferRef.current);
-        } else if (code === 127) {
-          if (cursorPositionRef.current > 0) {
-            const after = inputBufferRef.current.slice(cursorPositionRef.current);
-            inputBufferRef.current = inputBufferRef.current.slice(0, cursorPositionRef.current - 1) + after;
-            cursorPositionRef.current--;
-            term.write('\b' + after + ' ' + `\x1b[${after.length + 1}D`);
-          }
-        } else if (code === 27 && data.length === 3) {
-          if (data === '\x1b[A') {
-            if (historyIndexRef.current > 0) {
-              historyIndexRef.current--;
-              const prevCommand = commandHistoryRef.current[historyIndexRef.current];
-              inputBufferRef.current = prevCommand;
-              cursorPositionRef.current = prevCommand.length;
-              term.write('\r\x1b[K');
-              promptMultilineRef.current = false;
-              writeShortPrompt();
-              term.write(prevCommand);
+        switch (data) {
+          case '\r':
+            abandonLine();
+            handleCommand(buf);
+            return;
+          case '\x03':
+            abandonLine();
+            term.write('^C');
+            set('');
+            historyIndexRef.current = history.length;
+            writePrompt();
+            return;
+          case '\x04':
+            if (!buf) {
+              historyIndexRef.current = history.length;
+              writePrompt();
+              return;
             }
-          } else if (data === '\x1b[B') {
-            if (historyIndexRef.current < commandHistoryRef.current.length - 1) {
-              historyIndexRef.current++;
-              const nextCommand = commandHistoryRef.current[historyIndexRef.current];
-              inputBufferRef.current = nextCommand;
-              cursorPositionRef.current = nextCommand.length;
-              term.write('\r\x1b[K');
-              writeShortPrompt();
-              term.write(nextCommand);
+            set(buf.slice(0, pos) + buf.slice(pos + 1), pos);
+            break;
+          case '\x0c':
+            term.write('\x1b[H\x1b[2J' + getPromptInfo() + '\r\n');
+            lineCursorRef.current = 0;
+            break;
+          case '\x7f':
+          case '\b':
+            if (pos > 0) set(buf.slice(0, pos - 1) + buf.slice(pos), pos - 1);
+            break;
+          case '\x1b[3~':
+            set(buf.slice(0, pos) + buf.slice(pos + 1), pos);
+            break;
+          case '\x1b[A':
+            if (historyIndexRef.current > 0) set(history[--historyIndexRef.current]);
+            break;
+          case '\x1b[B':
+            if (historyIndexRef.current < history.length - 1) {
+              set(history[++historyIndexRef.current]);
             } else {
-              historyIndexRef.current = commandHistoryRef.current.length;
-              inputBufferRef.current = '';
-              cursorPositionRef.current = 0;
-              term.write('\r\x1b[K');
-              writeShortPrompt();
+              historyIndexRef.current = history.length;
+              set('');
             }
-          } else if (data === '\x1b[C') {
-            if (cursorPositionRef.current >= inputBufferRef.current.length && hadGhost) {
-              inputBufferRef.current += hadGhost;
-              cursorPositionRef.current = inputBufferRef.current.length;
-              term.write(hadGhost);
-            } else if (cursorPositionRef.current < inputBufferRef.current.length) {
-              cursorPositionRef.current++;
-              term.write(data);
-            }
-          } else if (data === '\x1b[D') {
-            if (cursorPositionRef.current > 0) {
-              cursorPositionRef.current--;
-              term.write(data);
-            }
+            break;
+          case '\x1b[C':
+          case '\x05':
+          case '\x1b[F':
+          case '\x1bOF':
+          case '\x1b[4~':
+          case '\t':
+            if (atEnd && ghost) set(buf + ghost);
+            else if (data === '\t') handleTabCompletion();
+            else if (data === '\x1b[C') set(buf, Math.min(pos + 1, buf.length));
+            else set(buf);
+            break;
+          case '\x1b[D':
+            set(buf, Math.max(pos - 1, 0));
+            break;
+          case '\x01':
+          case '\x1b[H':
+          case '\x1bOH':
+          case '\x1b[1~':
+            set(buf, 0);
+            break;
+          case '\x0b':
+            set(buf.slice(0, pos), pos);
+            break;
+          case '\x15':
+            set(buf.slice(pos), 0);
+            break;
+          case '\x17': {
+            const kept = buf.slice(0, pos).replace(/\S+\s*$/, '');
+            set(kept + buf.slice(pos), kept.length);
+            break;
           }
-        } else if (code === 9) {
-          if (hadGhost && cursorPositionRef.current === inputBufferRef.current.length) {
-            inputBufferRef.current += hadGhost;
-            cursorPositionRef.current = inputBufferRef.current.length;
-            term.write(hadGhost);
-          } else {
-            handleTabCompletion();
-          }
-        } else if (code === 3) {
-          term.write('^C');
-          inputBufferRef.current = '';
-          cursorPositionRef.current = 0;
-          historyIndexRef.current = commandHistoryRef.current.length;
-          tabPressCountRef.current = 0;
-          writePrompt();
-        } else if (code === 4) {
-          inputBufferRef.current = '';
-          cursorPositionRef.current = 0;
-          historyIndexRef.current = commandHistoryRef.current.length;
-          tabPressCountRef.current = 0;
-          writePrompt();
-        } else if (code >= 32 && code < 127) {
-          promptMultilineRef.current = false;
-          const text = data.replace(/[^\x20-\x7e]/g, '');
-          const before = inputBufferRef.current.slice(0, cursorPositionRef.current);
-          const after = inputBufferRef.current.slice(cursorPositionRef.current);
-          inputBufferRef.current = before + text + after;
-          cursorPositionRef.current += text.length;
-          term.write(text + after);
-          if (after.length > 0) {
-            term.write(`\x1b[${after.length}D`);
+          default: {
+            const text = data.startsWith('\x1b') ? '' : data.replace(/[^\x20-\x7e]/g, '');
+            if (!text) {
+              ghostTextRef.current = ghost;
+              return;
+            }
+            set(buf.slice(0, pos) + text + buf.slice(pos), pos + text.length);
           }
         }
 
-        // Show ghost suggestion
-        if (inputBufferRef.current && cursorPositionRef.current === inputBufferRef.current.length) {
-          const ghost = computeGhostText();
-          if (ghost) {
-            term.write(`${ANSI.dim}${ghost}${ANSI.reset}\x1b[${ghost.length}D`);
-            ghostTextRef.current = ghost;
-          }
-        }
+        const next = computeGhostText();
+        ghostTextRef.current = next;
+        renderLine(next);
       });
 
       xtermRef.current = term;
@@ -621,7 +591,7 @@ export default function Terminal() {
       cancelled = true;
       teardown?.();
     };
-  }, [handleCommand, handleTabCompletion, computeGhostText, writePrompt, writeShortPrompt, applyTheme, getPromptInfo, getTerminalContext]);
+  }, [handleCommand, handleTabCompletion, computeGhostText, renderLine, writePrompt, applyTheme, getPromptInfo, getTerminalContext]);
 
   return (
     <div

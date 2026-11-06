@@ -12,6 +12,7 @@ A terminal-emulated personal website built with Next.js, TypeScript, and libghos
 - **Pure Prompt** — git-aware prompt with branch and Node version
 - **Tab Completion** — commands and file paths with ghost text suggestions
 - **Command History** — arrow key navigation with `history | grep` support
+- **Line Editing** — Ctrl+A/E/K/U/W/L/D, Home/End, Delete; long lines wrap and edit correctly
 - **Persistent State** — todo list and aliases saved to localStorage
 - **Responsive** — auto-fits viewport, handles resize
 

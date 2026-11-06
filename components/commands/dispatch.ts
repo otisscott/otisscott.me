@@ -341,22 +341,13 @@ export function helpCommand(cols = 80): string {
 }
 
 /** Tab completion — driven by the table plus the virtual filesystem. */
-export function getCompletions(input: string): { completions: string[]; prefix: string } {
-  const trimmed = input.trim();
-  const parts = trimmed.split(' ');
-
-  // Completing a command name
-  if (parts.length === 1 && !trimmed.includes(' ')) {
-    return { completions: COMMAND_NAMES.filter(cmd => cmd.startsWith(trimmed)), prefix: '' };
+export function getCompletions(input: string): { completions: string[]; prefix: string; isCommand: boolean } {
+  const words = input.slice(input.lastIndexOf('|') + 1).trimStart().split(' ');
+  const prefix = words[words.length - 1];
+  if (words.length === 1) {
+    return { completions: COMMAND_NAMES.filter(cmd => cmd.startsWith(prefix)), prefix, isCommand: true };
   }
-
-  // Completing a path argument
-  if (parts.length >= 1) {
-    const pathArg = parts.slice(1).join(' ') || '';
-    return { completions: fileSystem.getCompletions(pathArg), prefix: pathArg };
-  }
-
-  return { completions: [], prefix: '' };
+  return { completions: fileSystem.getCompletions(prefix), prefix, isCommand: false };
 }
 
 /** Expand a user alias, unless it would shadow a builtin. */
