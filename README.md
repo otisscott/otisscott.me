@@ -72,6 +72,7 @@ runs as part of `bun run build` (or on demand via `bun run sync:gitlog`).
 | `experience` | Work history |
 | `projects` | Portfolio projects |
 | `contact` | Email and social links |
+| `pair <food\|grape>` | Wine pairing with everyday and splurge bottles |
 
 ### Tools
 | Command | Description |
@@ -86,6 +87,7 @@ runs as part of `bun run build` (or on demand via `bun run sync:gitlog`).
 | `neofetch` | System info display |
 | `ping [host]` | Simulated ICMP |
 | `date` | Current date/time |
+| `share [cmd]` | Copy an otisscott.me link that runs a command |
 
 ### Easter Eggs
 | Command | Description |
