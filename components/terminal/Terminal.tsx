@@ -21,6 +21,7 @@ import {
 } from '@/components/commands/handlers';
 import type { Job } from '@/components/commands/handlers';
 import {
+  COMMANDS,
   runCommand,
   resolveAlias,
   getCompletions,
@@ -29,6 +30,8 @@ import {
 import type { CommandContext } from '@/components/commands/dispatch';
 import { startBgJob, startKonami, startScreensaver, stopAllAnimations } from '@/components/commands/interactive';
 import { ANSI, padEndVisible, stripAnsi, visibleLength } from '@/lib/filesystem/types';
+
+const UNLINKABLE = new Set(['alias', 'unalias', 'todo']);
 
 export default function Terminal() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -207,7 +210,7 @@ export default function Terminal() {
             if (fCmd === 'lolcat') {
               piped = lolcat(piped);
             } else if (fCmd === 'cowsay') {
-              piped = cowsayCommand([stripAnsi(piped)], cols);
+              piped = cowsayCommand([stripAnsi(piped).replace(/\s*\n\s*/g, ' ')], cols);
             } else if (fCmd === 'grep') {
               const pattern = fArgs.join(' ');
               if (!pattern) {
@@ -373,12 +376,29 @@ export default function Terminal() {
         }
       };
 
+      const runFromHash = () => {
+        let cmd: string;
+        try {
+          cmd = decodeURIComponent(window.location.hash.slice(1));
+        } catch {
+          return;
+        }
+        cmd = cmd.replace(/[^\x20-\x7e]/g, '').trim();
+        const name = cmd.split(/[ |]/)[0];
+        if (!(name in COMMANDS) || UNLINKABLE.has(name) || interactiveModeRef.current) return;
+        inputBufferRef.current = cmd;
+        cursorPositionRef.current = cmd.length;
+        renderLine();
+        handleCommand(cmd);
+      };
+
       // Initialize terminal after fonts load
       const initTerminal = () => {
         // Fit first so term.cols reflects actual screen width
         fitTerminal();
         // Then write welcome (adapts to cols)
         writeWelcome();
+        runFromHash();
         // Scroll to show the prompt at the bottom once layout settles
         setTimeout(() => xtermRef.current?.scrollToBottom(), 0);
       };
@@ -400,6 +420,7 @@ export default function Terminal() {
       };
 
       window.addEventListener('resize', handleViewportResize);
+      window.addEventListener('hashchange', runFromHash);
       window.visualViewport?.addEventListener('resize', handleViewportResize);
       window.visualViewport?.addEventListener('scroll', handleViewportResize);
 
@@ -563,6 +584,7 @@ export default function Terminal() {
 
       return () => {
         window.removeEventListener('resize', handleViewportResize);
+        window.removeEventListener('hashchange', runFromHash);
         window.visualViewport?.removeEventListener('resize', handleViewportResize);
         window.visualViewport?.removeEventListener('scroll', handleViewportResize);
         wrapper.removeEventListener('focusin', handleTerminalFocus);
