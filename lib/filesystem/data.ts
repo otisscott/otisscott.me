@@ -6,6 +6,8 @@
 import { DirectoryNode, FileNode } from './types';
 import { gitCommits } from './git-log-data';
 
+export const EMAIL = atob('b3Rpc21zY290dEBnbWFpbC5jb20=');
+
 function createFile(
   name: string,
   content: string,
@@ -240,7 +242,7 @@ Systematic approach to wine tasting, grape varieties, and regions.`),
     createFile('email.txt', `📧 Email Contact
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-otismscott@gmail.com
+${EMAIL}
 
 For inquiries about:
   • Technology consulting & collaboration

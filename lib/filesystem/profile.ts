@@ -1,8 +1,9 @@
 import { fileSystem } from '@/lib/filesystem';
 import type { FileNode } from '@/lib/filesystem/types';
 
+export { EMAIL } from '@/lib/filesystem/data';
+
 export const NAME = 'Otis Scott';
-export const EMAIL = 'otismscott@gmail.com';
 
 export interface Role {
   title: string;
