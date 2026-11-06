@@ -350,6 +350,37 @@ ${ANSI.bold}EXAMPLES${ANSI.reset}
     todo done 1
     todo rm 2
     todo clear`,
+  pair: `${ANSI.bold}NAME${ANSI.reset}
+    pair - wine pairing for a dish or grape
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    pair <food | grape>
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Suggests a grape or style for a dish, why it works, and an everyday
+    and a splurge bottle. Give a grape (nebbiolo, riesling...) to see what
+    it pairs with. Unknown dishes are matched by keyword; failing that,
+    Champagne. Run with no argument to list foods and grapes.
+
+${ANSI.bold}EXAMPLES${ANSI.reset}
+    pair steak
+    pair kimchi stew
+    pair nebbiolo`,
+  share: `${ANSI.bold}NAME${ANSI.reset}
+    share - link that runs a command
+
+${ANSI.bold}SYNOPSIS${ANSI.reset}
+    share [command]
+
+${ANSI.bold}DESCRIPTION${ANSI.reset}
+    Print an otisscott.me link that runs a command when opened, and copy it
+    to the clipboard. Without an argument, uses the most recent linkable
+    command from history. Pipes of linkable commands are allowed.
+
+${ANSI.bold}EXAMPLES${ANSI.reset}
+    share
+    share experience
+    share pair steak`,
   cal: `${ANSI.bold}NAME${ANSI.reset}
     cal - display a calendar
 

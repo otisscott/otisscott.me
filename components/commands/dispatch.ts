@@ -12,6 +12,7 @@
 import { Terminal as XTerm } from 'ghostty-web';
 import { ANSI } from '@/lib/filesystem/types';
 import { fileSystem } from '@/lib/filesystem';
+import { isPairKey } from '@/lib/filesystem/pairings';
 import { themes, themeNames, ColorMode } from '@/lib/theme/themes';
 import type { TerminalContext } from '@/components/commands/interactive';
 import {
@@ -28,13 +29,59 @@ import {
   packageManagerCommand, uptimeCommand, dockerCommand, manCommand,
   calCommand, todoCommand, aliasCommand, unaliasCommand, jobsCommand,
   fgCommand, bgCommand, fortuneCommand, figletCommand, wineCommand,
-  momoCommand, lolcat, setExitCode,
+  momoCommand, pairCommand, lolcat, setExitCode,
 } from '@/components/commands/handlers';
 import type { Job } from '@/components/commands/handlers';
 
 /** Returned by commands that take over the terminal and drive their own prompt. */
 export const TAKEOVER = 'takeover' as const;
 export type CommandResult = void | typeof TAKEOVER;
+
+export const LINKABLE = new Set([
+  'whoami', 'skills', 'experience', 'contact', 'projects', 'help', 'ls', 'tree',
+  'neofetch', 'fortune', 'cowsay', 'lolcat', 'cal', 'date', 'uptime', 'gl', 'wine',
+  'momo', 'matrix', 'sl', 'aquarium', 'htop', 'traceroute', 'snake',
+]);
+
+function isLinkableSegment(seg: string): boolean {
+  const [name, ...rest] = seg.trim().split(/\s+/);
+  if (name === 'pair' && rest.length > 0) return isPairKey(rest.join(' '));
+  return rest.length === 0 && LINKABLE.has(name);
+}
+
+export function isLinkable(cmd: string): boolean {
+  return cmd.split('|').every(isLinkableSegment);
+}
+
+const SHARE_ORIGIN = 'https://otisscott.me/#';
+
+function shareLink(cmd: string): string {
+  const normalized = cmd.split('|').map(seg => seg.trim()).join('|');
+  return SHARE_ORIGIN + encodeURIComponent(normalized).replace(/%7C/g, '|');
+}
+
+function shareCommand(c: CommandContext): CommandResult {
+  const given = c.args.join(' ').trim();
+  const target = given || [...c.history].reverse().find(isLinkable);
+  if (!target || !isLinkable(target)) {
+    c.out(`${ANSI.dim}Nothing to share. Run a linkable command first (e.g. experience, pair steak, fortune | cowsay), then share${ANSI.reset}`);
+    return;
+  }
+  const url = shareLink(target);
+  const link = `\x1b]8;;${url}\x07${ANSI.cyan}${ANSI.underline}${url}${ANSI.reset}\x1b]8;;\x07`;
+  const finish = (copied: boolean) => {
+    c.out(copied ? `${link}\n${ANSI.dim}Copied to clipboard${ANSI.reset}` : link);
+    c.interactive.resetInput();
+    c.interactive.writePrompt();
+  };
+  const write = navigator.clipboard?.writeText(url);
+  if (!write) {
+    finish(false);
+  } else {
+    write.then(() => finish(true), () => finish(false));
+  }
+  return TAKEOVER;
+}
 
 export interface CommandContext {
   args: string[];
@@ -242,6 +289,14 @@ export const COMMANDS: Record<string, CommandEntry> = {
   snake: {
     category: 'Tools', description: 'Play snake',
     run: c => { startSnake(c.interactive); return TAKEOVER; },
+  },
+  pair: {
+    category: 'Portfolio', description: 'Wine pairing for a dish or grape',
+    run: c => c.out(pairCommand(c.args, c.cols)),
+  },
+  share: {
+    category: 'Tools', description: 'Copy a link that runs a command',
+    run: shareCommand,
   },
 
   // ── Hidden — completable but not in help ────────────────────────────

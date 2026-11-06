@@ -11,10 +11,14 @@ A terminal-emulated personal website built with Next.js, TypeScript, and libghos
 - **Multiple Themes** — Tokyo Night, Dracula, Nord, and more (light/dark auto-detection)
 - **Pure Prompt** — git-aware prompt with branch and Node version
 - **Tab Completion** — commands and file paths with ghost text suggestions
-- **Command History** — arrow key navigation with `history | grep` support
+- **Command History** — arrow key navigation with `history | grep` support, saved across visits
 - **Command Links** — `otisscott.me/#experience` or `/#fortune|cowsay` runs that command on load; only argument-free commands from the `LINKABLE` list in `Terminal.tsx`, so a link cannot put its own text on the page
+- **curl-friendly** — `curl otisscott.me` returns a colored text profile (`proxy.ts` rewrites CLI user agents to `app/cli/route.ts`)
+- **Wine Pairing** — `pair <food | grape>` with an everyday and a splurge bottle (`lib/filesystem/pairings.ts`)
+- **Sharing** — `share` copies a link that reruns your last linkable command
+- **Mobile Key Bar** — Tab, Esc, arrows and ^C on touch screens
 - **Line Editing** — Ctrl+A/E/K/U/W/L/D, Home/End, Delete; long lines wrap and edit correctly
-- **Persistent State** — todo list and aliases saved to localStorage
+- **Persistent State** — todo list, aliases and history saved to localStorage
 - **Responsive** — auto-fits viewport, handles resize
 
 ## Tech Stack
@@ -102,7 +106,10 @@ runs as part of `bun run build` (or on demand via `bun run sync:gitlog`).
 ## Project Structure
 
 ```
+proxy.ts                   # Sends curl/wget/HTTPie/xh to the text profile
+
 app/
+├── cli/route.ts           # Plain-text ANSI profile for CLI clients
 ├── globals.css            # Global styles
 ├── layout.tsx             # Root layout + metadata
 ├── opengraph-image.png    # Link-preview image
@@ -120,8 +127,10 @@ components/
     └── man-pages.ts        # Man page content
 
 lib/
+├── cli-screen.ts          # Builds the curl output
 ├── filesystem/
 │   ├── data.ts            # Virtual filesystem content
+│   ├── pairings.ts        # Wine pairing styles, bottles and food keywords
 │   ├── profile.ts         # Name, role, experience, contact (shared by terminal + HTML)
 │   └── types.ts           # Types + ANSI codes
 └── theme/

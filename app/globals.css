@@ -180,6 +180,52 @@ html.js .profile {
   opacity: 0 !important;
 }
 
+.key-bar {
+  display: none;
+  flex: none;
+  gap: 6px;
+  height: 40px;
+  padding-top: 6px;
+  box-sizing: border-box;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.key-bar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .key-bar {
+    display: flex;
+  }
+}
+
+.key-bar-key {
+  flex: 1 0 auto;
+  min-width: 44px;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--fg-bright);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--fg-secondary);
+  border-radius: 6px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-color-scheme: light) {
+  .key-bar-key {
+    color: #343b58;
+    border-color: #9699a3;
+  }
+}
+
+.key-bar-key:active {
+  background: var(--fg-secondary);
+}
+
 /* Selection Styling */
 ::selection {
   background: var(--bg-tertiary);

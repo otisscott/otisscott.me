@@ -24,17 +24,44 @@ import {
   runCommand,
   resolveAlias,
   getCompletions,
+  isLinkable,
   TAKEOVER,
 } from '@/components/commands/dispatch';
 import type { CommandContext } from '@/components/commands/dispatch';
 import { startBgJob, startKonami, startScreensaver, stopAllAnimations } from '@/components/commands/interactive';
 import { ANSI, padEndVisible, stripAnsi, visibleLength } from '@/lib/filesystem/types';
 
-const LINKABLE = new Set([
-  'whoami', 'skills', 'experience', 'contact', 'projects', 'help', 'ls', 'tree',
-  'neofetch', 'fortune', 'cowsay', 'lolcat', 'cal', 'date', 'uptime', 'gl', 'wine',
-  'momo', 'matrix', 'sl', 'aquarium', 'htop', 'traceroute', 'snake',
-]);
+const HISTORY_KEY = 'otisscott-terminal-history';
+const HISTORY_LIMIT = 500;
+
+function loadHistory(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]');
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === 'string').slice(-HISTORY_LIMIT)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history: string[]) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    return;
+  }
+}
+
+const KEY_BAR = [
+  { label: 'Tab', text: 'Tab', data: '\t' },
+  { label: 'Esc', text: 'Esc', data: '\x1b' },
+  { label: 'Up arrow', text: '↑', data: '\x1b[A' },
+  { label: 'Down arrow', text: '↓', data: '\x1b[B' },
+  { label: 'Left arrow', text: '←', data: '\x1b[D' },
+  { label: 'Right arrow', text: '→', data: '\x1b[C' },
+  { label: 'Control C', text: '^C', data: '\x03' },
+];
 
 export default function Terminal() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,6 +83,7 @@ export default function Terminal() {
   const lineCursorRef = useRef(0);
   const konamiRef = useRef<string[]>([]);
   const lastActivityRef = useRef<number | null>(null);
+  const sendKeyRef = useRef<((data: string) => void) | null>(null);
 
   const getPromptInfo = useCallback(() => {
     const cols = xtermRef.current?.cols ?? 80;
@@ -176,6 +204,10 @@ export default function Terminal() {
 
     if (trimmedCommand) {
       commandHistoryRef.current.push(trimmedCommand);
+      if (commandHistoryRef.current.length > HISTORY_LIMIT) {
+        commandHistoryRef.current.splice(0, commandHistoryRef.current.length - HISTORY_LIMIT);
+      }
+      saveHistory(commandHistoryRef.current);
       historyIndexRef.current = commandHistoryRef.current.length;
 
       // Resolve aliases (single-pass)
@@ -338,6 +370,8 @@ export default function Terminal() {
 
       // Load aliases from localStorage
       aliasesRef.current = loadAliases();
+      commandHistoryRef.current = loadHistory();
+      historyIndexRef.current = commandHistoryRef.current.length;
 
       // Write welcome message (adapts to terminal width)
       const writeWelcome = () => {
@@ -386,9 +420,8 @@ export default function Terminal() {
         } catch {
           return;
         }
-        const segments = cmd.split('|').map(seg => seg.trim());
-        if (!segments.every(seg => LINKABLE.has(seg)) || interactiveModeRef.current) return;
-        cmd = segments.join(' | ');
+        if (!isLinkable(cmd) || interactiveModeRef.current) return;
+        cmd = cmd.split('|').map(seg => seg.trim()).join(' | ');
         inputBufferRef.current = cmd;
         cursorPositionRef.current = cmd.length;
         renderLine();
@@ -456,7 +489,7 @@ export default function Terminal() {
       };
       darkQuery.addEventListener('change', handleColorSchemeChange);
 
-      term.onData((data) => {
+      const handleData = (data: string) => {
         lastActivityRef.current = Date.now();
 
         // Interactive mode intercept (e.g., vim command buffer)
@@ -581,8 +614,10 @@ export default function Terminal() {
         const next = computeGhostText();
         ghostTextRef.current = next;
         renderLine(next);
-      });
+      };
 
+      term.onData(handleData);
+      sendKeyRef.current = handleData;
       xtermRef.current = term;
 
       return () => {
@@ -597,6 +632,7 @@ export default function Terminal() {
         // freed terminal, which ghostty-web throws on once per tick.
         stopAllAnimations();
         interactiveModeRef.current = null;
+        sendKeyRef.current = null;
         term.dispose();
         xtermRef.current = null;
       };
@@ -627,6 +663,21 @@ export default function Terminal() {
         ref={terminalRef}
         className="terminal-wrapper"
       />
+      <div className="key-bar" role="toolbar" aria-label="Terminal keys">
+        {KEY_BAR.map(key => (
+          <button
+            key={key.label}
+            type="button"
+            className="key-bar-key"
+            aria-label={key.label}
+            onPointerDown={e => e.preventDefault()}
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => sendKeyRef.current?.(key.data)}
+          >
+            {key.text}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

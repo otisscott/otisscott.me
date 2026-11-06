@@ -7,6 +7,8 @@ import { fileSystem } from '@/lib/filesystem';
 import { ANSI, PromptColors, padEndVisible, visibleLength, stripAnsi } from '@/lib/filesystem/types';
 import { fakeCommits, NODE_VERSION } from '@/lib/filesystem/data';
 import { NAME, EMAIL, currentRole, getExperience, getSocialLinks } from '@/lib/filesystem/profile';
+import { STYLES, findPairing, pairingFoods } from '@/lib/filesystem/pairings';
+import type { Style } from '@/lib/filesystem/pairings';
 import { DirectoryNode, FileNode } from '@/lib/filesystem/types';
 
 // Track last command exit status
@@ -728,7 +730,53 @@ ${wrapWords(pick.name, w - 2).map(l => `  ${ANSI.bold}${l}${ANSI.reset}`).join('
   ${ANSI.cyan}${pick.region}${ANSI.reset}
 ${wrapWords(`Notes of ${pick.note}.`, w - 2).map(l => `  ${ANSI.italic}${l}${ANSI.reset}`).join('\n')}
 
-${ANSI.dim}${wrapWords('Curated by the Director of Technology, Manhattan Wine Company.', w).join('\n')}${ANSI.reset}`;
+${ANSI.dim}${wrapWords('Curated by the Director of Technology, Manhattan Wine Company. Try pair <food> for something useful.', w).join('\n')}${ANSI.reset}`;
+}
+
+// Pair command
+export function pairCommand(args: string[], cols = 80): string {
+  const w = Math.max(24, cols - 2);
+  const query = args.join(' ').trim();
+  const rule = `${ANSI.dim}${'━'.repeat(Math.min(40, w))}${ANSI.reset}`;
+  const block = (style: Style) => [
+    ...wrapWords(style.why, w - 2).map(l => `  ${l}`),
+    '',
+    `  ${ANSI.green}Everyday${ANSI.reset}  ${style.everyday}`,
+    `  ${ANSI.yellow}Splurge${ANSI.reset}   ${style.splurge}`,
+    '',
+    `${ANSI.dim}${ANSI.italic}${style.quip}${ANSI.reset}`,
+  ].join('\n');
+
+  if (!query) {
+    const grapes = Object.values(STYLES).map(s => s.aliases[0]).join(', ');
+    return `${ANSI.bold}usage:${ANSI.reset} pair <food | grape>
+
+${ANSI.cyan}Foods${ANSI.reset}
+${wrapWords(pairingFoods().join(', '), w - 2).map(l => `  ${l}`).join('\n')}
+
+${ANSI.cyan}Grapes${ANSI.reset}
+${wrapWords(grapes, w - 2).map(l => `  ${l}`).join('\n')}
+
+${ANSI.dim}Anything else gets a best guess.${ANSI.reset}`;
+  }
+
+  const match = findPairing(query);
+  if (match.kind === 'grape') {
+    return `🍇 ${ANSI.bold}${ANSI.magenta}${match.style.grape}${ANSI.reset}
+${rule}
+${wrapWords(`Try it with: ${match.foods.join(', ')}.`, w - 2).map(l => `  ${ANSI.bold}${l}${ANSI.reset}`).join('\n')}
+${block(match.style)}`;
+  }
+  if (match.kind === 'fallback') {
+    return `${ANSI.dim}${wrapWords(`No match for "${query}". When in doubt, bubbles:`, w).join('\n')}${ANSI.reset}
+
+🍾 ${ANSI.bold}${ANSI.magenta}${match.style.grape}${ANSI.reset}
+${rule}
+${block(match.style)}`;
+  }
+  return `🍷 ${ANSI.bold}${query}${ANSI.reset} ${ANSI.dim}→${ANSI.reset} ${ANSI.bold}${ANSI.magenta}${match.style.grape}${ANSI.reset}
+${rule}
+${block(match.style)}`;
 }
 
 // Echo command
