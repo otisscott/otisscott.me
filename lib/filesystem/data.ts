@@ -477,4 +477,4 @@ Made with ⌨️ and ☕ by Otis Scott`),
 export const fakeCommits = gitCommits;
 
 // Node version for prompt
-export const NODE_VERSION = 'v20.11.0';
+export const NODE_VERSION = 'v26.12.1';
