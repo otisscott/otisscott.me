@@ -27,6 +27,11 @@ updates:
       # Drop this ignore once eslint-plugin-react supports ESLint 10.
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # typescript-eslint (via eslint-config-next) throws "does not support
+      # TS 7.0" at load, so TypeScript 7 breaks `bun run lint`. Drop this
+      # ignore once typescript-eslint's typescript peer range includes 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       javascript-dependencies:
         patterns:
