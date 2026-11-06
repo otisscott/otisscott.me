@@ -13,7 +13,7 @@ A terminal-emulated personal website built with Next.js, TypeScript, and libghos
 - **Tab Completion** — commands and file paths with ghost text suggestions
 - **Command History** — arrow key navigation with `history | grep` support, saved across visits
 - **Command Links** — `otisscott.me/#experience` or `/#fortune|cowsay` runs that command on load; only argument-free commands from the `LINKABLE` list in `Terminal.tsx`, so a link cannot put its own text on the page
-- **curl-friendly** — `curl otisscott.me` returns a colored text profile (`proxy.ts` rewrites CLI user agents to `app/cli/route.ts`)
+- **curl-friendly** — `curl -L otisscott.me` returns a colored text profile (`proxy.ts` rewrites CLI user agents to `app/cli/route.ts`)
 - **Wine Pairing** — `pair <food | grape>` with an everyday and a splurge bottle (`lib/filesystem/pairings.ts`)
 - **Sharing** — `share` copies a link that reruns your last linkable command
 - **Mobile Key Bar** — Tab, Esc, arrows and ^C on touch screens
