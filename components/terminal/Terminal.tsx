@@ -451,8 +451,11 @@ export default function Terminal() {
         requestAnimationFrame(initTerminal);
       }
 
+      let trailingFit: number | undefined;
       const handleViewportResize = () => {
         fitTerminal();
+        window.clearTimeout(trailingFit);
+        trailingFit = window.setTimeout(fitTerminal, 75);
       };
 
       window.addEventListener('resize', handleViewportResize);
@@ -628,6 +631,7 @@ export default function Terminal() {
         wrapper.removeEventListener('focusin', handleTerminalFocus);
         darkQuery.removeEventListener('change', handleColorSchemeChange);
         clearInterval(idleInterval);
+        window.clearTimeout(trailingFit);
         // Must precede dispose(): a running animation would keep writing to a
         // freed terminal, which ghostty-web throws on once per tick.
         stopAllAnimations();
