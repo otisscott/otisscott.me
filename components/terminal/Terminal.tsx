@@ -577,11 +577,12 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
           writePrompt();
         } else if (code >= 32 && code < 127) {
           promptMultilineRef.current = false;
+          const text = data.replace(/[^\x20-\x7e]/g, '');
           const before = inputBufferRef.current.slice(0, cursorPositionRef.current);
           const after = inputBufferRef.current.slice(cursorPositionRef.current);
-          inputBufferRef.current = before + data + after;
-          cursorPositionRef.current++;
-          term.write(data + after);
+          inputBufferRef.current = before + text + after;
+          cursorPositionRef.current += text.length;
+          term.write(text + after);
           if (after.length > 0) {
             term.write(`\x1b[${after.length}D`);
           }
