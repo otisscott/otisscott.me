@@ -6,6 +6,7 @@
 import { fileSystem } from '@/lib/filesystem';
 import { ANSI, PromptColors, padEndVisible, visibleLength, stripAnsi } from '@/lib/filesystem/types';
 import { fakeCommits, NODE_VERSION } from '@/lib/filesystem/data';
+import { NAME, EMAIL, currentRole, getExperience, getSocialLinks } from '@/lib/filesystem/profile';
 import { DirectoryNode, FileNode } from '@/lib/filesystem/types';
 
 // Track last command exit status
@@ -149,9 +150,10 @@ function renderMarkdown(content: string): string {
 
 // Whoami command
 export function whoamiCommand(): string {
-  return `${ANSI.bold}${ANSI.brightCyan}Otis Scott${ANSI.reset}
+  const role = currentRole();
+  return `${ANSI.bold}${ANSI.brightCyan}${NAME}${ANSI.reset}
 ${ANSI.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${ANSI.reset}
-${ANSI.white}Director of Technology @ Manhattan Wine Company${ANSI.reset}`;
+${ANSI.white}${role.title} @ ${role.company}${ANSI.reset}`;
 }
 
 // Skills command
@@ -187,26 +189,11 @@ export function skillsCommand(): string {
 
 // Experience command
 export function experienceCommand(): string {
-  const expDir = fileSystem.getNodeAtPath('work/experience');
-  if (!expDir || expDir.type !== 'directory') {
-    return `${ANSI.red}Error: Could not load experience data${ANSI.reset}`;
-  }
-
   let output = `${ANSI.bold}Work Experience${ANSI.reset}\n${ANSI.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${ANSI.reset}\n\n`;
 
-  const files = Array.from((expDir as DirectoryNode).children.values())
-    .filter((node): node is FileNode => node.type === 'file')
-    .reverse();
-
-  for (const file of files) {
-    const content = file.content;
-    const lines = content.split('\n');
-    const title = lines[0].replace('# ', '');
-    const company = lines[1].replace('## ', '');
-    const period = lines[3];
-
+  for (const { title, company, period } of getExperience()) {
     output += `${ANSI.bold}${ANSI.cyan}${title}${ANSI.reset}\n`;
-    output += `${ANSI.yellow}${company}${ANSI.reset} ${ANSI.dim}${period}${ANSI.reset}\n\n`;
+    output += `${ANSI.yellow}${company}${ANSI.reset} ${ANSI.dim}📅 ${period}${ANSI.reset}\n\n`;
   }
 
   output += `${ANSI.dim}Use 'cat work/experience/<file>' to see full details${ANSI.reset}`;
@@ -218,32 +205,22 @@ export function contactCommand(): string {
   let output = `${ANSI.bold}Get In Touch${ANSI.reset}\n${ANSI.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${ANSI.reset}\n\n`;
 
   output += `${ANSI.cyan}📧 Email${ANSI.reset}\n`;
-  output += `   ${ANSI.white}otismscott@gmail.com${ANSI.reset}\n\n`;
+  output += `   ${ANSI.white}${EMAIL}${ANSI.reset}\n\n`;
 
-  const socialContent = fileSystem.readFile('contact/social.json');
-  if (socialContent) {
-    try {
-      const social = JSON.parse(socialContent);
-      output += `${ANSI.cyan}🌐 Social${ANSI.reset}\n`;
+  const icons: Record<string, string> = {
+    github: '🐙',
+    twitter: '🐦',
+    linkedin: '💼',
+    bluesky: '🦋',
+    mastodon: '🐘',
+  };
 
-      const icons: Record<string, string> = {
-        github: '🐙',
-        twitter: '🐦',
-        linkedin: '💼',
-        bluesky: '🦋',
-        mastodon: '🐘',
-      };
-
-      for (const [platform, data] of Object.entries(social)) {
-        const { url, handle, description } = data as { url: string; handle: string; description: string };
-        const icon = icons[platform] || '🔗';
-        output += `   ${icon} ${ANSI.green}${platform}${ANSI.reset}: ${ANSI.white}${handle}${ANSI.reset}\n`;
-        output += `      ${ANSI.dim}${description}${ANSI.reset}\n`;
-        output += `      ${ANSI.blue}https://${url}${ANSI.reset}\n\n`;
-      }
-    } catch {
-      // Ignore parse errors
-    }
+  output += `${ANSI.cyan}🌐 Social${ANSI.reset}\n`;
+  for (const { platform, url, handle, description } of getSocialLinks()) {
+    const icon = icons[platform] || '🔗';
+    output += `   ${icon} ${ANSI.green}${platform}${ANSI.reset}: ${ANSI.white}${handle}${ANSI.reset}\n`;
+    output += `      ${ANSI.dim}${description}${ANSI.reset}\n`;
+    output += `      ${ANSI.blue}https://${url}${ANSI.reset}\n\n`;
   }
 
   return output;

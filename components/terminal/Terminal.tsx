@@ -30,12 +30,7 @@ import type { CommandContext } from '@/components/commands/dispatch';
 import { startBgJob, startKonami, startScreensaver, stopAllAnimations } from '@/components/commands/interactive';
 import { ANSI, padEndVisible, stripAnsi } from '@/lib/filesystem/types';
 
-interface TerminalProps {
-  onCommand?: (command: string) => void;
-  onData?: (data: string) => void;
-}
-
-export default function Terminal({ onCommand, onData }: TerminalProps) {
+export default function Terminal() {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -202,10 +197,6 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
       commandHistoryRef.current.push(trimmedCommand);
       historyIndexRef.current = commandHistoryRef.current.length;
 
-      if (onCommand) {
-        onCommand(trimmedCommand);
-      }
-
       // Resolve aliases (single-pass)
       const resolved = resolveAlias(trimmedCommand, aliasesRef.current);
 
@@ -324,7 +315,7 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
     cursorPositionRef.current = 0;
     tabPressCountRef.current = 0;
     writePrompt();
-  }, [onCommand, writePrompt, writeOutput, getTerminalContext, applyTheme]);
+  }, [writePrompt, writeOutput, getTerminalContext, applyTheme]);
 
   useLayoutEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
@@ -596,10 +587,6 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
             ghostTextRef.current = ghost;
           }
         }
-
-        if (onData) {
-          onData(data);
-        }
       });
 
       xtermRef.current = term;
@@ -625,13 +612,16 @@ export default function Terminal({ onCommand, onData }: TerminalProps) {
         if (cancelled || !terminalRef.current || xtermRef.current) return;
         teardown = setup(terminalRef.current);
       })
-      .catch((err) => console.error('ghostty-web failed to initialise', err));
+      .catch((err) => {
+        console.error('ghostty-web failed to initialise', err);
+        document.documentElement.classList.remove('js');
+      });
 
     return () => {
       cancelled = true;
       teardown?.();
     };
-  }, [handleCommand, handleTabCompletion, computeGhostText, onData, writePrompt, writeShortPrompt, applyTheme, getPromptInfo, getTerminalContext]);
+  }, [handleCommand, handleTabCompletion, computeGhostText, writePrompt, writeShortPrompt, applyTheme, getPromptInfo, getTerminalContext]);
 
   return (
     <div

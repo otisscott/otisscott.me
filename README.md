@@ -20,7 +20,7 @@ A terminal-emulated personal website built with Next.js, TypeScript, and libghos
 - **Framework**: Next.js 16 (App Router, Turbopack)
 - **Language**: TypeScript
 - **Terminal**: [ghostty-web](https://github.com/coder/ghostty-web) — libghostty compiled to WASM, with FitAddon and OSC 8 / URL link providers
-- **Styling**: CSS Modules + Global CSS
+- **Styling**: Global CSS
 - **Deployment**: Vercel
 
 ## Getting Started
@@ -33,6 +33,14 @@ bun dev
 
 Adding a command means one entry in `components/commands/dispatch.ts` — help text,
 tab completion, and execution all derive from it.
+
+The page also server-renders a plain HTML profile (name, role, experience, contact)
+from the same virtual filesystem data, via `lib/filesystem/profile.ts`. Crawlers,
+link previews and screen readers read it; it is shown visibly when JavaScript is off or
+the terminal fails to load.
+
+`bun scripts/take-screenshot.mjs` (with `bun dev` running) regenerates the README
+hero and the Open Graph image `app/opengraph-image.png`.
 
 `gl` output is generated from real git history by `scripts/update-git-log.sh`, which
 runs as part of `bun run build` (or on demand via `bun run sync:gitlog`).
@@ -94,8 +102,11 @@ runs as part of `bun run build` (or on demand via `bun run sync:gitlog`).
 ```
 app/
 ├── globals.css            # Global styles
-├── layout.tsx             # Root layout
-└── page.tsx               # Terminal page
+├── layout.tsx             # Root layout + metadata
+├── opengraph-image.png    # Link-preview image
+├── page.tsx               # Profile + terminal
+├── Profile.tsx            # Server-rendered HTML profile
+└── TerminalLoader.tsx     # Client-only terminal import
 
 components/
 ├── terminal/
@@ -109,6 +120,7 @@ components/
 lib/
 ├── filesystem/
 │   ├── data.ts            # Virtual filesystem content
+│   ├── profile.ts         # Name, role, experience, contact (shared by terminal + HTML)
 │   └── types.ts           # Types + ANSI codes
 └── theme/
     ├── themes.ts          # Theme registry

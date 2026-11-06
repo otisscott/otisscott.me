@@ -93,7 +93,7 @@ I also build **Shopify apps** for wine merchants — tools for LWIN-based invent
   ]),
   createDirectory('work', [
     createDirectory('experience', [
-      // Inserted oldest-first; experienceCommand() calls .reverse() for newest-first display
+      // Inserted oldest-first; getExperience() reverses for newest-first display
       createFile('intern-ironwood.md', `# Research Intern
 ## Ironwood Capital Management
 

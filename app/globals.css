@@ -68,6 +68,74 @@ a:hover {
   text-decoration: underline;
 }
 
+.home,
+.terminal-host {
+  width: 100vw;
+  height: var(--app-height);
+  overflow: hidden;
+}
+
+.terminal-loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  color: var(--fg-primary);
+}
+
+html:not(.js) .home {
+  height: auto;
+  overflow: visible;
+}
+
+html:not(.js) body {
+  position: static;
+  height: auto;
+  overflow: auto;
+}
+
+html:not(.js) .terminal-host {
+  display: none;
+}
+
+.profile {
+  min-height: 100vh;
+  padding: 32px 24px;
+  line-height: 1.6;
+  background: var(--bg-primary);
+  color: var(--fg-primary);
+}
+
+.profile > * {
+  max-width: 64ch;
+}
+
+.profile h1 {
+  color: var(--fg-bright);
+  font-size: 1.5rem;
+}
+
+.profile h2 {
+  color: var(--color-cyan);
+  font-size: 1rem;
+  margin-top: 24px;
+}
+
+.profile ul {
+  list-style: none;
+}
+
+html.js .profile {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 /* Terminal Container Styles */
 .terminal-container {
   width: 100%;

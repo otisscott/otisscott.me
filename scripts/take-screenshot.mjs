@@ -1,9 +1,9 @@
-import { chromium } from 'playwright';
+import { chromium } from '@playwright/test';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: 'chrome' });
   const page = await browser.newPage({
     viewport: { width: 1280, height: 720 },
     colorScheme: 'dark'
@@ -15,7 +15,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   await sleep(3000);
 
   // Click on the terminal to focus it
-  await page.click('.xterm', { force: true });
+  await page.click('.terminal-wrapper', { force: true });
   await sleep(500);
 
   // Type neofetch
@@ -35,6 +35,11 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     type: 'png'
   });
 
-  console.log('Screenshot saved to screenshots/readme-hero.png');
+  await page.screenshot({
+    path: 'app/opengraph-image.png',
+    type: 'png'
+  });
+
+  console.log('Screenshot saved to screenshots/readme-hero.png and app/opengraph-image.png');
   await browser.close();
 })();
