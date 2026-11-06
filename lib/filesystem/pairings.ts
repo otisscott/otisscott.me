@@ -12,7 +12,7 @@ export const STYLES: Record<string, Style> = {
     grape: 'Cabernet Sauvignon',
     aliases: ['cab', 'cabernet', 'bordeaux', 'napa'],
     why: 'Firm tannin binds to fat and protein, so a rich cut tastes cleaner and the wine tastes softer.',
-    everyday: 'Marjosse, Bordeaux Rouge',
+    everyday: "Blason d'Issan, Margaux",
     splurge: 'Château Margaux, Margaux',
     quip: 'Structured, strongly typed, ages well.',
   },
