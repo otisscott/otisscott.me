@@ -253,7 +253,7 @@ For inquiries about:
       github: {
         url: "github.com/otisscott",
         handle: "@otisscott",
-        description: "Code, dotfiles, and open source projects"
+        description: "Code and open source projects"
       },
       linkedin: {
         url: "linkedin.com/in/otis-scott",
@@ -388,9 +388,7 @@ A terminal-inspired portfolio built with Next.js and libghostty.
 - Claude Code agent orchestration framework (Oracle, Scout, Phoenix, Maestro, etc.)
 - Event-driven hooks for context injection, memory awareness, and session continuity
 - Knowledge management system with semantic search and crystallization
-- Cross-platform install scripts (macOS/Linux/WSL)
-
-🔗 github.com/otisscott/dotfiles`),
+- Cross-platform install scripts (macOS/Linux/WSL)`),
   ]),
   createDirectory('blog', [
     createDirectory('2025', [

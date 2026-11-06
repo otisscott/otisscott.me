@@ -21,7 +21,6 @@ import {
 } from '@/components/commands/handlers';
 import type { Job } from '@/components/commands/handlers';
 import {
-  COMMANDS,
   runCommand,
   resolveAlias,
   getCompletions,
@@ -31,7 +30,11 @@ import type { CommandContext } from '@/components/commands/dispatch';
 import { startBgJob, startKonami, startScreensaver, stopAllAnimations } from '@/components/commands/interactive';
 import { ANSI, padEndVisible, stripAnsi, visibleLength } from '@/lib/filesystem/types';
 
-const UNLINKABLE = new Set(['alias', 'unalias', 'todo']);
+const LINKABLE = new Set([
+  'whoami', 'skills', 'experience', 'contact', 'projects', 'help', 'ls', 'tree',
+  'neofetch', 'fortune', 'cowsay', 'lolcat', 'cal', 'date', 'uptime', 'gl', 'wine',
+  'momo', 'matrix', 'sl', 'aquarium', 'htop', 'traceroute', 'snake',
+]);
 
 export default function Terminal() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -383,9 +386,9 @@ export default function Terminal() {
         } catch {
           return;
         }
-        cmd = cmd.replace(/[^\x20-\x7e]/g, '').trim();
-        const name = cmd.split(/[ |]/)[0];
-        if (!(name in COMMANDS) || UNLINKABLE.has(name) || interactiveModeRef.current) return;
+        const segments = cmd.split('|').map(seg => seg.trim());
+        if (!segments.every(seg => LINKABLE.has(seg)) || interactiveModeRef.current) return;
+        cmd = segments.join(' | ');
         inputBufferRef.current = cmd;
         cursorPositionRef.current = cmd.length;
         renderLine();
